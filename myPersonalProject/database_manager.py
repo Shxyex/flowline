@@ -1,0 +1,92 @@
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, ForeignKey, create_engine
+from sqlalchemy.orm import DeclarativeBase, relationship, sessionmaker
+from flask_login import UserMixin
+from datetime import datetime
+
+engine = create_engine("sqlite:///flowline.db")
+
+class Base(DeclarativeBase):
+    pass
+
+class Provider(Base):
+    __tablename__ = "providers"
+
+    id = Column(Integer, primary_key=True)
+    business_name = Column(String(200), nullable=False)
+    category = Column(String(100), nullable=False)
+    address = Column(String(300))
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    credentials = relationship("ProviderCredentials", back_populates="provider")
+    services = relationship("ProviderService", back_populates="provider")
+    appointments = relationship("Appointment", back_populates="provider")
+    queue_entries = relationship("QueueEntry", back_populates="provider")
+
+class ProviderCredentials(Base):
+    __tablename__ = "provider_credentials"
+
+    id = Column(Integer, primary_key=True)
+    provider_id = Column(Integer, ForeignKey("providers.id"), unique=True, nullable=False)
+    email = Column(String(255), unique=True, nullable=False)
+    password_hash = Column(String(255), nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    provider = relationship("Provider", back_populates="credentials")
+
+class ProviderService(Base):
+    __tablename__ = "provider_services"
+
+    id = Column(Integer, primary_key=True)
+    provider_id = Column(Integer, ForeignKey("providers.id"), nullable=False)
+    name = Column(String(100), nullable=False)
+    duration_minutes = Column(Integer, nullable=False)
+
+    provider = relationship("Provider", back_populates="services")
+    appointments = relationship("Appointment", back_populates="service")
+    queue_entries = relationship("QueueEntry", back_populates="service")
+
+
+class Appointment(Base):
+    __tablename__ = "appointments"
+
+    id = Column(Integer, primary_key=True)
+    provider_id = Column(Integer, ForeignKey("providers.id"), nullable=False)
+    service_id = Column(Integer, ForeignKey("provider_services.id"), nullable=True)
+    customer_name = Column(String(200))
+    customer_phone = Column(String(50))
+    customer_email = Column(String(255))
+    start = Column(DateTime(timezone=True), nullable=False)
+    end = Column(DateTime(timezone=True), nullable=False)
+    duration_minutes = Column(Integer, nullable=False)
+    notes = Column(Text)
+    status = Column(String(50), default="pending")
+
+    provider = relationship("Provider",        back_populates="appointments")
+    service = relationship("ProviderService", back_populates="appointments")
+
+class QueueEntry(Base):
+    __tablename__ = "queue_entries"
+
+    id = Column(Integer, primary_key=True)
+    provider_id = Column(Integer, ForeignKey("providers.id"),         nullable=False)
+    service_id = Column(Integer, ForeignKey("provider_services.id"), nullable=True)
+    customer_name = Column(String(200))
+    customer_phone = Column(String(50))
+    start = Column(DateTime(timezone=True))
+    end = Column(DateTime(timezone=True))
+    duration_minutes = Column(Integer, nullable=False)
+    position = Column(Integer, nullable=False)
+    original_position = Column(Integer, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    status = Column(String(50), default="pending")
+
+    provider = relationship("Provider", back_populates="queue_entries")
+    service = relationship("ProviderService", back_populates="queue_entries")
+
+Base.metadata.create_all(engine)
+Session = sessionmaker(bind=engine)
+
+class User(UserMixin):
+    def __init__(self, id, email):
+        self.id    = id
+        self.email = email

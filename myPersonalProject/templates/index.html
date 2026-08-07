@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Flowline - Termine und Walk-ins in einem System</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @keyframes blob {
+      0%, 100% { transform: translate(0, 0) scale(1); }
+      25% { transform: translate(20px, -50px) scale(1.1); }
+      50% { transform: translate(-20px, 20px) scale(0.9); }
+      75% { transform: translate(50px, 50px) scale(1.05); }
+    }
+
+    @keyframes fade-in {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    @keyframes slide-up {
+      from {
+        opacity: 0;
+        transform: translateY(30px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: Inter, system-ui, sans-serif;
+      background: linear-gradient(180deg, #f0fdf4 0%, #ffffff 45%, #f7fee7 100%);
+      color: #14532d;
+    }
+
+    .animate-blob { animation: blob 7s infinite; }
+    .animation-delay-2000 { animation-delay: 2s; }
+    .animation-delay-4000 { animation-delay: 4s; }
+    .animate-fade-in { animation: fade-in 0.6s ease-out; }
+    .animate-slide-up { animation: slide-up 0.8s ease-out; }
+    .animation-delay-200 { animation-delay: 0.2s; animation-fill-mode: backwards; }
+    .animation-delay-400 { animation-delay: 0.4s; animation-fill-mode: backwards; }
+
+    *:focus { outline: none; }
+    *:focus-visible {
+      outline: 2px solid rgb(34, 197, 94);
+      outline-offset: 2px;
+    }
+
+    .feature-card {
+      transition: transform 0.25s ease, box-shadow 0.25s ease;
+    }
+
+    .feature-card:hover {
+      transform: translateY(-6px);
+      box-shadow: 0 20px 40px rgba(34, 197, 94, 0.12);
+    }
+  </style>
+</head>
+<body>
+  <header class="sticky top-0 z-30 border-b border-green-100/80 bg-white/80 backdrop-blur">
+    <div class="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
+      <a href="#hero" class="text-xl font-black tracking-tight text-green-800">Flowline</a>
+      <nav class="hidden gap-6 text-sm font-medium text-green-800 md:flex">
+        <a href="#features" class="hover:text-green-600">Funktionen</a>
+        <a href="#benefits" class="hover:text-green-600">Vorteile</a>
+        <a href="#cta" class="hover:text-green-600">Testen</a>
+      </nav>
+      <a href="#cta" class="rounded-full bg-green-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-green-700">Kostenlos testen</a>
+    </div>
+  </header>
+
+  <main>
+    <section id="hero" class="relative overflow-hidden px-6 py-24 sm:py-32">
+      <div id="blob1" class="absolute -left-10 top-10 h-72 w-72 rounded-full bg-green-200/50 blur-3xl animate-blob"></div>
+      <div id="blob2" class="absolute right-0 top-32 h-72 w-72 rounded-full bg-lime-200/50 blur-3xl animate-blob animation-delay-2000"></div>
+      <div id="blob3" class="absolute bottom-0 left-1/3 h-72 w-72 rounded-full bg-emerald-100/60 blur-3xl animate-blob animation-delay-4000"></div>
+
+      <div class="relative mx-auto max-w-6xl">
+        <div>
+          <span class="animate-fade-in inline-flex rounded-full border border-green-200 bg-white/80 px-4 py-2 text-sm font-semibold text-green-700 shadow-sm backdrop-blur">
+            Für Friseure, Barbershops und Tattoo-Studios
+          </span>
+          <h1 class="animate-slide-up mt-6 max-w-3xl text-5xl font-black leading-tight tracking-tight text-green-950 sm:text-6xl">
+            Termine und <span class="text-green-600">Walk-ins</span> in einer intelligenten Zeitlinie
+          </h1>
+          <p class="animate-slide-up animation-delay-200 mt-6 max-w-2xl text-lg leading-8 text-green-800/80">
+            Flowline plant feste Buchungen und spontane Kunden in einem einzigen System. Freie Lücken werden automatisch genutzt, Wartezeiten laufend neu berechnet und dein Team sieht sofort, wer gerade dran ist und wer als Nächstes kommt.
+          </p>
+          <div class="animate-slide-up animation-delay-400 mt-8 flex flex-col gap-4 sm:flex-row">
+            <a href="#cta" class="rounded-full bg-green-600 px-7 py-3.5 text-center font-semibold text-white shadow-lg shadow-green-600/20 transition hover:bg-green-700">Kostenlos testen</a>
+            <a href="#features" class="rounded-full border border-green-200 bg-white px-7 py-3.5 text-center font-semibold text-green-800 transition hover:border-green-400 hover:bg-green-50">Funktionen ansehen</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="features" class="px-6 py-20">
+      <div class="mx-auto max-w-6xl">
+        <div class="max-w-2xl">
+          <p class="text-sm font-semibold uppercase tracking-[0.2em] text-green-600">Funktionen</p>
+          <h2 class="mt-3 text-3xl font-black tracking-tight text-green-950 sm:text-4xl">Ein System für den kompletten Tagesablauf</h2>
+        </div>
+        <div class="mt-12 grid gap-6 md:grid-cols-3">
+          <article class="feature-card rounded-[1.75rem] border border-green-100 bg-white p-8 shadow-sm">
+            <h3 class="text-xl font-bold text-green-950">Gemeinsame Zeitlinie</h3>
+            <p class="mt-3 text-green-800/75">Feste Termine und spontane Kunden werden nicht getrennt verwaltet, sondern automatisch in einer gemeinsamen Reihenfolge organisiert.</p>
+          </article>
+          <article class="feature-card rounded-[1.75rem] border border-green-100 bg-white p-8 shadow-sm">
+            <h3 class="text-xl font-bold text-green-950">Dynamische Warteschlange</h3>
+            <p class="mt-3 text-green-800/75">Walk-ins können per QR-Code oder manuell eingetragen werden und erhalten eine geschätzte Startzeit auf Basis der aktuellen Auslastung.</p>
+          </article>
+          <article class="feature-card rounded-[1.75rem] border border-green-100 bg-white p-8 shadow-sm">
+            <h3 class="text-xl font-bold text-green-950">Echtzeit-Anpassung</h3>
+            <p class="mt-3 text-green-800/75">Bei neuen Terminen, Absagen oder entfernten Warteschlangen-Einträgen berechnet das System alle nachfolgenden Zeiten sofort neu.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="benefits" class="px-6 py-20">
+      <div class="mx-auto grid max-w-6xl gap-10 rounded-[2rem] bg-green-950 px-8 py-10 text-white lg:grid-cols-2 lg:px-12 lg:py-14">
+        <div>
+          <p class="text-sm font-semibold uppercase tracking-[0.2em] text-green-300">Vorteile</p>
+          <h2 class="mt-3 text-3xl font-black tracking-tight sm:text-4xl">Weniger Leerlauf, weniger Chaos, mehr planbare Auslastung</h2>
+        </div>
+        <div class="grid gap-5 text-green-100 sm:grid-cols-2">
+          <div>
+            <p class="text-3xl font-black text-white">Weniger Leerzeiten</p>
+            <p class="mt-2">Freie Zeitfenster zwischen Terminen werden automatisch für spontane Kunden nutzbar gemacht.</p>
+          </div>
+          <div>
+            <p class="text-3xl font-black text-white">Klare Reihenfolge</p>
+            <p class="mt-2">Dein Team sieht jederzeit, wer aktuell bedient wird und wer danach eingeplant ist.</p>
+          </div>
+          <div>
+            <p class="text-3xl font-black text-white">Weniger No-Shows</p>
+            <p class="mt-2">Erinnerungen und Benachrichtigungen helfen dabei, Ausfälle zu reduzieren und freie Slots schneller neu zu besetzen.</p>
+          </div>
+          <div>
+            <p class="text-3xl font-black text-white">Einfach im Alltag</p>
+            <p class="mt-2">Minimales Interface, schnelle Eingaben und ein Dashboard, das in Sekunden verständlich ist.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="cta" class="px-6 py-20">
+      <div class="mx-auto max-w-4xl rounded-[2rem] border border-green-100 bg-white p-10 text-center shadow-xl shadow-green-900/5">
+        <h2 class="text-3xl font-black tracking-tight text-green-950 sm:text-4xl">Bring Termine und Walk-ins in einen planbaren Ablauf</h2>
+        <p class="mx-auto mt-4 max-w-2xl text-lg text-green-800/75">Wenn dein Studio Termine und spontane Kundschaft gleichzeitig bedient, zeigt dir Flowline in Echtzeit, was jetzt passiert und wie die nächsten freien Minuten optimal genutzt werden.</p>
+        <div class="mt-8 flex flex-col justify-center gap-4 sm:flex-row">
+          <a href="/provider-login-page" class="rounded-full bg-green-600 px-7 py-3.5 font-semibold text-white transition hover:bg-green-700">Kostenlos anmelden</a>
+          <a href="/info" class="rounded-full border border-green-200 px-7 py-3.5 font-semibold text-green-800 transition hover:bg-green-50">Mehr erfahren</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    let scrollY = 0;
+
+    window.addEventListener('scroll', () => {
+      scrollY = window.scrollY;
+
+      const blob1 = document.getElementById('blob1');
+      const blob2 = document.getElementById('blob2');
+      const blob3 = document.getElementById('blob3');
+
+      if (blob1) blob1.style.transform = `translateY(${scrollY * 0.3}px)`;
+      if (blob2) blob2.style.transform = `translateY(${scrollY * 0.2}px)`;
+      if (blob3) blob3.style.transform = `translateY(${scrollY * 0.1}px)`;
+    });
+
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+      anchor.addEventListener('click', function (e) {
+        e.preventDefault();
+        const target = document.querySelector(this.getAttribute('href'));
+        if (target) {
+          target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      });
+    });
+
+    if ('ontouchstart' in window) {
+      document.querySelectorAll('.feature-card').forEach(card => {
+        card.addEventListener('touchstart', function() {
+          this.style.transform = 'translateY(-4px)';
+        });
+        card.addEventListener('touchend', function() {
+          this.style.transform = 'translateY(0)';
+        });
+      });
+    }
+  </script>
+</body>
+</html>

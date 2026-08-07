@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Login für Anbieter</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+</head>
+<body>
+  <h1 class="text-3xl font-semibold text-gray-900 mb-8">
+    Melde dich in deinem Anbieter‑Konto an
+  </h1>
+
+  <form onsubmit="submitForm('/provider-login'); return false;"
+        class="w-full max-w-md bg-white p-8 rounded-xl shadow-lg border border-gray-200">
+
+    <h2 class="text-2xl font-semibold text-center text-gray-800 mb-6">
+      Als Anbieter anmelden
+    </h2>
+
+    <div class="form-group mb-5">
+      <label for="provider-email">E-Mail</label>
+      <input type="email" id="provider-email" name="email" placeholder="E-Mail" required>
+    </div>
+
+    <div class="form-group mb-5">
+      <label for="provider-password">Passwort</label>
+
+      <div class="password-wrapper">
+        <input type="password" id="provider-password" name="password" placeholder="Passwort" minlength="8" required>
+      </div>
+    </div>
+
+    <div class="forgot-password">
+      <section>
+        <input type="checkbox" id="remember_me" name="remember_me" checked>
+        <label for="remember_me">Angemeldet bleiben</label>
+      </section>
+
+      <section>
+        <a href="/password-reset">Passwort vergessen</a>
+      </section>
+    </div>
+
+    <button type="submit" class="btn-primary">Einloggen</button>
+
+    <p class="provider-register">
+      Noch keinen Account?
+      <a href="/register/provider">Hier registrieren</a>
+    </p>
+
+  </form>
+
+  <div id="error-popup" class="popup">
+    <div id="error" class="error"></div>
+  </div>
+</body>
+<script>
+  let popupTimeout = null;
+
+  var socket = io();
+
+  socket.on("connect", () => {
+     socket.emit("join_room", { room: "{{ room_id }}" });
+  });
+
+  socket.on("error", (data) => {
+    document.getElementById("error").textContent = data.error;
+    const popup = document.getElementById("error-popup");
+    if (popup && popupTimeout == null) {
+      popup.classList.add("show");
+      popupTimeout = setTimeout(() => {
+        popupTimeout = null;
+        popup.classList.remove("show")
+        }, 5000
+      );
+    }
+  });
+
+  async function submitForm(actionUrl) {
+    const email = document.getElementById("provider-email")
+    const password = document.getElementById("provider-password")
+    const remember_me = document.getElementById("remember_me")
+    const formData = new FormData();
+
+    formData.append("email", email.value);
+    formData.append("password", password.value);
+    formData.append("remember_me", remember_me.checked);
+
+    const res = await fetch(actionUrl, {
+      method: "POST",
+      body: formData
+    })
+
+    if (res.ok) {
+      window.location.href = "/dashboard";
+    } else {
+      const data = await res.json().catch(() => null);
+      console.log(data?.error);
+    }
+  }
+</script>
+</html>

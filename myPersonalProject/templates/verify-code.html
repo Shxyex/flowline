@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>E-Mail Verifizierung</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+  <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+</head>
+<body>
+  <div class="verify-container">
+    <h1>Code eingeben</h1>
+    <p>
+      Wir haben dir einen 4-stelligen Code per E-Mail geschickt.
+    </p>
+
+    <form onsubmit="submitForm('{{ submit_url }}'); return false;" id="verifyForm">
+      <div class="code-boxes">
+        <input class="code-input" type="text" maxlength="1">
+        <input class="code-input" type="text" maxlength="1">
+        <input class="code-input" type="text" maxlength="1">
+        <input class="code-input" type="text" maxlength="1">
+      </div>
+      <input type="hidden" name="verification_code" id="verification_code">
+      <button type="submit" class="btn-primary">Bestätigen</button>
+    </form>
+    <div class="resend">
+      <span>Kein Code erhalten? </span><a href="#" onclick="resendCode('{{ resend_url }}'); return false;">Code erneut senden</a>
+    </div>
+  </div>
+  <div id="message-popup" class="popup">
+      <div id="message" class="message"></div>
+  </div>
+  <div id="error-popup" class="popup">
+      <div id="error" class="error"></div>
+  </div>
+</body>
+<script>
+  let popupTimeout = null;
+  const boxes = document.querySelectorAll(".code-input");
+  const hidden = document.getElementById("verification_code");
+
+  boxes.forEach((box, i) => {
+    box.addEventListener("input", () => {
+
+      // Nur Zahlen erlauben
+      box.value = box.value.replace(/\D/g, "");
+
+      // Automatisch zum nächsten Feld springen
+      if (box.value && i < boxes.length - 1) {
+        boxes[i + 1].focus();
+      }
+
+      // Verstecktes Input aktualisieren
+      hidden.value = [...boxes].map(b => b.value).join("");
+    });
+  });
+
+  var socket = io()
+
+  socket.on("connect", () => {
+     socket.emit("join_room", { room: "{{ room_id }}" });
+  });
+
+  socket.on("message", (data) => {
+    document.getElementById("message").textContent = data.message;
+    const popup = document.getElementById("message-popup");
+    if (popup && popupTimeout == null) {
+      popup.classList.add("show");
+      popupTimeout = setTimeout(() => {
+        popupTimeout = null;
+        popup.classList.remove("show")
+        }, 5000
+      );
+    }
+  });
+
+  socket.on("error", (data) => {
+    document.getElementById("error").textContent = data.error;
+    const popup = document.getElementById("error-popup");
+    if (popup && popupTimeout == null) {
+      popup.classList.add("show");
+      popupTimeout = setTimeout(() => {
+        popupTimeout = null;
+        popup.classList.remove("show")
+        }, 5000
+      );
+    }
+  });
+
+  async function submitForm(actionUrl) {
+    const verification_code = document.getElementById("verification_code")
+    const formData = new FormData();
+
+    formData.append("verification_code", verification_code.value);
+
+    const res = await fetch(actionUrl, {
+      method: "POST",
+      body: formData
+    })
+
+    if (res.ok) {
+      if (actionUrl.includes("/update_email") || actionUrl.includes("/change_password")) {
+        window.location.href = "/dashboard/settings";
+      } else if (actionUrl.includes("/register/provider")) {
+        window.location.href = "/onboarding";
+      } else {
+        window.location.href = "/password-update";
+      }
+    } else {
+      const data = await res.json().catch(() => null);
+      console.log(data?.error);
+    }
+
+  /* .then(r => r.text())
+    .then(response => {
+      if (response === "SUCCESS") {
+        window.location.href = "/";
+      }
+    }) */
+  }
+
+  async function resendCode(actionUrl) {
+    const res = await fetch(actionUrl, { method: "POST" })
+
+    if (res.ok) {
+      socket.emit("message", { message: "Code erneut gesendet." });
+    } else {
+      const data = await res.json().catch(() => null);
+      console.log(data?.error);
+    }
+  }
+</script>
+</html>

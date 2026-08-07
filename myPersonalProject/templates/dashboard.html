@@ -1,0 +1,1229 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+  <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+  <style>
+    * { font-family: 'DM Sans', sans-serif; }
+
+    body { background: #f5f5f0; }
+
+    /* ── FullCalendar overrides ── */
+    .fc { height: 100%; }
+
+    .fc .fc-button {
+      background: #fff;
+      color: #2e7d32;
+      border: 1px solid #c8e6c9;
+      border-radius: 8px;
+      padding: 5px 13px;
+      font-weight: 500;
+      font-size: 0.85rem;
+      box-shadow: none;
+      transition: all 0.15s ease;
+    }
+    .fc .fc-button:hover {
+      background: #f1f8f2;
+      border-color: #81c784;
+      color: #1b5e20;
+    }
+    .fc .fc-button-primary {
+      background: #43a047 !important;
+      color: #fff !important;
+      border-color: #43a047 !important;
+    }
+    .fc .fc-button-primary:hover {
+      background: #388e3c !important;
+      border-color: #388e3c !important;
+    }
+    .fc .fc-button-primary:not(:disabled).fc-button-active {
+      background: #2e7d32 !important;
+      border-color: #2e7d32 !important;
+    }
+    .fc-toolbar-title {
+      font-size: 1.1rem !important;
+      font-weight: 600;
+      color: #1b5e20;
+    }
+    .fc-col-header-cell {
+      background: #f9fafb;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: #555;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .fc-timegrid-slot { height: 40px !important; }
+    .fc-timegrid-slot-label { font-size: 0.75rem; color: #9ca3af; }
+    .fc-event {
+      border-radius: 6px !important;
+      border: none !important;
+      font-size: 0.8rem !important;
+      padding: 2px 5px !important;
+    }
+    .fc-daygrid-day.fc-day-today,
+    .fc-timegrid-col.fc-day-today { background: #f0fdf4 !important; }
+
+    /* ── Base card ── */
+    .card {
+      background: #fff;
+      border-radius: 16px;
+      border: 1px solid #e5e7eb;
+    }
+
+    /* ── Stat cards ── */
+    .stat-card {
+      background: #fff;
+      border-radius: 16px;
+      border: 1px solid #e5e7eb;
+      padding: 20px 24px;
+    }
+    .stat-label {
+      font-size: 11px;
+      font-weight: 700;
+      color: #9ca3af;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      margin-bottom: 8px;
+    }
+    .stat-value {
+      font-size: 34px;
+      font-weight: 800;
+      color: #111;
+      line-height: 1;
+    }
+    .stat-sub {
+      font-size: 12px;
+      color: #9ca3af;
+      margin-top: 4px;
+    }
+
+    /* ── Aktuell dran ── */
+    .current-card {
+      background: #fff;
+      border-radius: 16px;
+      border: 1px solid #e5e7eb;
+      border-left: 5px solid #43a047;
+      padding: 20px;
+    }
+    .current-section-label {
+      font-size: 11px;
+      font-weight: 700;
+      color: #43a047;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 16px;
+    }
+    .current-avatar {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      background: #dcfce7;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      color: #15803d;
+      font-size: 22px;
+      flex-shrink: 0;
+    }
+    .current-name {
+      font-size: 20px;
+      font-weight: 800;
+      color: #111;
+      line-height: 1.1;
+    }
+    .current-service {
+      font-size: 13px;
+      color: #6b7280;
+      margin-top: 3px;
+    }
+    .current-duration {
+      font-size: 13px;
+      font-weight: 700;
+      color: #43a047;
+      margin-top: 3px;
+    }
+
+    /* ── Buttons ── */
+    .btn-primary {
+      width: 100%;
+      padding: 14px 20px;
+      border-radius: 12px;
+      font-size: 15px;
+      font-weight: 700;
+      color: white;
+      background-color: #43a047;
+      border: none;
+      cursor: pointer;
+      transition: background 0.15s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    .btn-primary:hover { background: #388e3c; }
+
+    .btn-noshow {
+      width: 100%;
+      padding: 12px 20px;
+      border-radius: 12px;
+      font-size: 14px;
+      font-weight: 700;
+      color: #dc2626;
+      background-color: white;
+      border: 1.5px solid #dc2626;
+      cursor: pointer;
+      transition: background 0.15s ease;
+      margin-top: 8px;
+      display: none;
+    }
+    .btn-noshow:hover { background: #fef2f2; }
+
+    .btn-add {
+      padding: 10px 18px;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 700;
+      color: white;
+      background-color: #43a047;
+      border: none;
+      cursor: pointer;
+    }
+    .btn-add:hover { background: #388e3c; }
+
+    .btn-secondary {
+      padding: 10px 20px;
+      border-radius: 10px;
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: #6b7280;
+      background-color: white;
+      border: 1px solid #d1d5db;
+      cursor: pointer;
+    }
+    .btn-secondary:hover { background: #f9fafb; }
+
+    .btn-delete {
+      display: none;
+      padding: 10px 20px;
+      border-radius: 10px;
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: white;
+      background-color: #DC2626;
+      border: none;
+      cursor: pointer;
+    }
+
+    .btn-delete:hover { background-color: #B91C1C; }
+
+    /* ── Nächste Termine ── */
+    .next-card {
+      background: #fff;
+      border-radius: 16px;
+      border: 1px solid #e5e7eb;
+      padding: 18px 20px;
+    }
+    .next-section-label {
+      font-size: 11px;
+      font-weight: 700;
+      color: #9ca3af;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      margin-bottom: 12px;
+    }
+    .appt-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 0;
+      border-bottom: 1px solid #f3f4f6;
+    }
+    .appt-item:last-child { border-bottom: none; }
+    .appt-time {
+      font-size: 13px;
+      font-weight: 700;
+      color: #374151;
+      min-width: 40px;
+    }
+    .appt-info { flex: 1; }
+    .appt-name { font-size: 13px; font-weight: 600; color: #111; }
+    .appt-svc { font-size: 12px; color: #9ca3af; margin-top: 1px; }
+    .badge-confirmed {
+      background: #dcfce7;
+      color: #15803d;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 9px;
+      border-radius: 99px;
+      white-space: nowrap;
+    }
+    .badge-pending {
+      background: #fef9c3;
+      color: #854d0e;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 9px;
+      border-radius: 99px;
+      white-space: nowrap;
+    }
+
+    /* ── Queue ── */
+    .queue-section-label {
+      font-size: 13px;
+      font-weight: 700;
+      color: #111;
+    }
+    .queue-item {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 14px 0;
+      border-bottom: 1px solid #f3f4f6;
+    }
+    .queue-item:last-child { border-bottom: none; }
+    .queue-num {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: #f3f4f6;
+      color: #6b7280;
+      font-weight: 800;
+      font-size: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .queue-num.active {
+      background: #43a047;
+      color: #fff;
+    }
+    .queue-name { font-size: 14px; font-weight: 700; color: #111; }
+    .queue-meta { font-size: 12px; color: #9ca3af; margin-top: 2px; }
+    .queue-status-waiting {
+      background: #fef9c3;
+      color: #854d0e;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: 99px;
+      white-space: nowrap;
+    }
+    .queue-status-active {
+      background: #dcfce7;
+      color: #15803d;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: 99px;
+      white-space: nowrap;
+    }
+    .queue-remove-btn {
+      width: 34px;
+      height: 34px;
+      border-radius: 8px;
+      border: 1px solid #e5e7eb;
+      background: #fff;
+      color: #9ca3af;
+      font-size: 18px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .queue-remove-btn:hover {
+      background: #fef2f2;
+      color: #dc2626;
+      border-color: #fecaca;
+    }
+
+    /* ── Modal ── */
+    .appointment-modal {
+      display: flex;
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background-color: rgba(0,0,0,0.5);
+      justify-content: center;
+      align-items: center;
+      z-index: 12;
+    }
+    .appointment-modal-container {
+      background-color: white;
+      padding: 30px;
+      border-radius: 16px;
+      width: 600px;
+      max-height: 90vh;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+    }
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 16px;
+    }
+    .form-group label { font-size: 14px; font-weight: 500; color: #555; }
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+      padding: 14px 16px;
+      border-radius: 10px;
+      border: 1px solid #d0d7e2;
+      font-size: 15px;
+      font-family: 'DM Sans', sans-serif;
+      transition: border-color .2s, box-shadow .2s;
+    }
+    .form-group input:focus,
+    .form-group select:focus,
+    .form-group textarea:focus {
+      border-color: #43a047;
+      box-shadow: 0 0 0 3px rgba(67,160,71,0.2);
+      outline: none;
+    }
+
+    /* ── Popup ── */
+    .popup {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: white;
+      padding: 14px 20px;
+      border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+      transform: translateX(150%);
+      transition: transform 0.35s cubic-bezier(0.34,1.56,0.64,1);
+      z-index: 100;
+    }
+    .popup.show { transform: translateX(0); }
+    .message {
+      background: #e6ffe6;
+      color: #006600;
+      padding: 10px 14px;
+      border-left: 4px solid #33cc33;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: 500;
+    }
+    .error {
+      background: #ffe5e5;
+      color: #b30000;
+      padding: 10px 14px;
+      border-left: 4px solid #ff4d4d;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: 500;
+    }
+    #sidebar a {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 15px 25px;
+      color: #1F2937; /* normaler Text */
+      text-decoration: none;
+      font-size: 15px;
+      font-weight: 500;
+      border-bottom: 1px solid rgba(0,0,0,0.06);
+      transition: background 0.25s ease, padding-left 0.25s ease, color 0.25s ease;
+    }
+    #sidebar a i {
+      width: 22px;
+      text-align: center;
+      color: #43a047; /* Grün-500 */
+    }
+    #sidebar a:hover {
+      background-color: rgba(67,160,71,0.10); /* Grün-500 mit 10% */
+      color: #2e7d32; /* Grün-700 */
+      font-weight: 600;
+      padding-left: 32px;
+    }
+    #sidebar a:hover i {
+      color: #2e7d32; /* Grün-700 */
+    }
+    .hint {
+      font-size: 13px;
+      color: #6b7280;
+      background: #f9fafb;
+      border: 1.5px dashed #d1d5db;
+      border-radius: 8px;
+      padding: 10px 14px;
+      line-height: 1.5;
+    }
+    .hint a {
+        color: #2d6a4f;
+        font-weight: 600;
+        text-decoration: none;
+    }
+    .hint a:hover {
+        text-decoration: underline;
+    }
+    .error-msg {
+      font-size: 13px;
+      color: #ef4444;
+      margin-top: 12px;
+      display: none;
+    }
+    .error-msg.show { display: block; }
+  </style>
+</head>
+
+<body>
+<div class="flex items-center gap-4">
+  <div class="text-[28px] cursor-pointer px-3 py-1 bg-black/5 text-green-600 fixed top-[10px] left-[10px]
+  rounded-md z-[1001] transition-colors duration-300 hover:bg-black/12" onclick="toggleMenu()">☰</div>
+  <span class="text-lg font-extrabold text-green-600 z-[1001] fixed top-[21px] left-[70px]">Flowline</span>
+</div>
+
+<div id="sidebar" class="fixed top-0 left-[-250px] w-[250px] h-full bg-white pt-[100px] transition-[left] duration-300 ease-in-out z-[1000] border-r border-gray-200">
+    <a href="/dashboard/settings"><i class="fa-solid fa-gear"></i> Einstellungen</a>
+    <a href="/support"><i class="fa-solid fa-question"></i> Hilfe</a>
+    <a href="/buy_subscription"><i class="fa-solid fa-cart-shopping"></i> Abonnement kaufen</a>
+</div>
+
+<div class="max-w-[1440px] mx-auto p-6 flex flex-col gap-5">
+
+  <!-- Delete confirm modal -->
+  <div id="delAppointmentModal" class="fixed hidden items-center justify-center inset-0 bg-black/50 z-[9999]">
+    <div class="flex flex-col gap-4 bg-white p-8 rounded-[14px] w-80 text-center">
+      <div class="flex gap-5">
+        <span class="text-lg font-bold text-gray-800">Termin wirklich löschen?</span>
+        <span class="text-gray-400 hover:text-gray-600 font-bold text-xl cursor-pointer" onclick="closeDelAppointmentModal()">✕</span>
+      </div>
+      <div class="flex justify-center gap-5">
+        <button type="button" class="btn-secondary" onclick="closeDelAppointmentModal()">Nein</button>
+        <form method="POST" onsubmit="deleteAppointment(); return false;">
+          <button type="submit" class="btn-delete" style="display:block;">Ja</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Appointment modal -->
+  <div id="appointment-modal" class="appointment-modal" hidden>
+    <div class="appointment-modal-container">
+      <div class="flex items-center justify-between mb-5">
+        <h3 id="modal-title" class="text-[#111] text-lg font-bold">Neuer Termin</h3>
+        <button onclick="closeNewAppointmentModal()" class="text-gray-400 hover:text-gray-600 font-bold text-xl">✕</button>
+      </div>
+      <form id="appointment-form" onsubmit="submitForm('/dashboard/appointments', 'appointment'); return false;">
+        <div class="form-group">
+          <label for="customer_name">Kundenname (optional, aber empfohlen)</label>
+          <input type="text" id="customer_name" name="customer_name" placeholder="Kundenname">
+        </div>
+        <div class="form-group">
+          <label for="appointment_datetime">Datum & Uhrzeit</label>
+          <input type="datetime-local" id="appointment_datetime" name="appointment_datetime" required>
+        </div>
+        <div class="form-group">
+          <label for="appointment_phone">Telefon (optional)</label>
+          <input type="tel" id="appointment_phone" name="appointment_phone" placeholder="0171 123456">
+        </div>
+        <div class="form-group">
+          <label for="appointment_email">E‑Mail (optional, aber empfohlen)</label>
+          <input type="email" id="appointment_email" name="appointment_email" placeholder="kunde@email.de">
+        </div>
+        <div class="form-group">
+          <label>Service (optional)</label>
+          {% if services %}
+            <select id="appointment_service" name="appointment_service" required>
+              <option value="">Kein Service</option>
+              {% for s in services %}
+                <option value="{{ s.id }}">{{ s.name }} ({{ s.duration_minutes }} Min)</option>
+              {% endfor %}
+            </select>
+          {% else %}
+            <p class="hint">Noch keine Services angelegt -
+                <a href="/dashboard/settings">Jetzt anlegen</a>
+            </p>
+          {% endif %}
+        </div>
+        <div class="form-group">
+          <label for="appointment_notes">Notiz (optional)</label>
+          <textarea id="appointment_notes" name="appointment_notes" placeholder="z.B. kommt mit Sohn" rows="2"></textarea>
+        </div>
+        <div class="flex justify-center gap-5">
+          <button type="button" class="btn-delete" onclick="openDelAppointmentModal()">Termin löschen</button>
+          <button type="button" class="btn-secondary" onclick="closeNewAppointmentModal()">Abbrechen</button>
+          <button type="submit" class="btn-primary" style="width:auto;">Speichern</button>
+        </div>
+      </form>
+      <div class="error-msg" id="appointment-error-msg">
+        Du musst mindestens einen Service anlegen, bevor du Termine erstellen kannst. Gehe dazu in die Einstellungen und öffne den Bereich Services.
+      </div>
+    </div>
+  </div>
+
+  <!-- Queue modal -->
+  <div id="queue-modal" class="appointment-modal" hidden>
+    <div class="appointment-modal-container">
+      <div class="flex items-center justify-between mb-5">
+        <h3 id="queue-modal-title" class="text-[#111] text-lg font-bold">Kunden zur Warteschlange hinzufügen</h3>
+        <button onclick="closeAddToQueueModal()" class="text-gray-400 hover:text-gray-600 font-bold text-xl">✕</button>
+      </div>
+      <form id="queue-form" onsubmit="submitForm('/dashboard/queue/add', 'queue'); return false;">
+        <div class="form-group">
+          <label for="customer_name">Kundenname (optional, aber empfohlen)</label>
+          <input type="text" id="customer_name" name="customer_name" placeholder="Kundenname">
+        </div>
+        <div class="form-group">
+          <label for="queue_phone">Telefon (optional)</label>
+          <input type="tel" id="queue_phone" name="queue_phone" placeholder="0171 123456">
+        </div>
+        <div class="form-group">
+          <label>Service (optional)</label>
+          {% if services %}
+            <select id="queue_service" name="queue_service" required>
+              <option value="">Kein Service</option>
+              {% for s in services %}
+                <option value="{{ s.id }}">{{ s.name }} ({{ s.duration_minutes }} Min)</option>
+              {% endfor %}
+            </select>
+          {% else %}
+            <p class="hint">Noch keine Services angelegt –
+                <a href="/dashboard/settings#services">Jetzt anlegen</a>
+            </p>
+          {% endif %}
+        </div>
+        <div class="flex justify-center gap-5">
+          <button type="button" class="btn-secondary" onclick="closeAddToQueueModal()">Abbrechen</button>
+          <button type="submit" class="btn-primary" style="width:auto;">Hinzufügen</button>
+        </div>
+      </form>
+      <div class="error-msg" id="queue-error-msg">
+        Du musst mindestens einen Service anlegen, bevor du Warteschlangen erstellen kannst. Gehe dazu in die Einstellungen und öffne den Bereich Services.
+      </div>
+    </div>
+  </div>
+
+  <!-- Header -->
+  <div class="flex items-center justify-between">
+    <h1 class="text-[1.8rem] font-extrabold text-[#111]">Dashboard</h1>
+    <button onclick="openNewAppointmentModal(true)"
+      class="flex items-center gap-2 px-5 py-3 rounded-[12px] text-white text-sm font-bold bg-[#43a047] hover:bg-[#388e3c] transition-colors">
+      + Neuer Termin
+    </button>
+  </div>
+
+  <!-- Stat row -->
+  <div class="grid grid-cols-3 gap-4">
+    <div class="stat-card">
+      <div class="stat-label">Termine heute</div>
+      <div class="flex gap-8">
+        <div>
+          <div class="stat-value" id="stat-today">0</div>
+          <div class="stat-sub">Gesamt</div>
+        </div>
+        <div>
+          <div class="stat-value" id="stat-today-pending" style="color:#854d0e;">0</div>
+          <div class="stat-sub">Ausstehend</div>
+        </div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Warteschlange</div>
+      <div class="stat-value" id="stat-queue">0</div>
+      <div class="stat-sub">Kunden warten gerade</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Ø Wartezeit</div>
+      <div class="stat-value" id="stat-wait">—</div>
+      <div class="stat-sub">Minuten heute</div>
+    </div>
+  </div>
+
+  <!-- Main grid -->
+  <div class="grid grid-cols-[1fr_340px] gap-4">
+
+    <!-- Kalender -->
+    <div class="card p-4 min-h-[560px]">
+      <div id="calendar" class="h-[540px]"></div>
+    </div>
+
+    <!-- Sidebar -->
+    <div class="flex flex-col gap-4">
+
+      <!-- Aktuell dran -->
+      <div class="current-card">
+        <div class="current-section-label">▶ Aktuell dran</div>
+        <div id="current-customer" class="flex items-center gap-4 mb-5">
+          <div id="current-avatar" class="current-avatar">—</div>
+          <div>
+            <div class="current-name" id="current-name">Niemand</div>
+            <div class="current-service" id="current-service">–</div>
+            <div class="current-duration" id="current-duration">–</div>
+          </div>
+        </div>
+        <button onclick="nextCustomer()" class="btn-primary">
+          Nächster Kunde →
+        </button>
+        <button onclick="customerNoShow('no_show')" id="no-show-btn" class="btn-noshow">
+          Nicht erschienen ✕
+        </button>
+      </div>
+
+      <!-- Nächste Termine -->
+      <div class="next-card">
+        <div class="next-section-label">Nächste Termine</div>
+        <ul id="next-appointments" style="list-style:none;padding:0;margin:0;">
+          <li style="font-size:0.85rem;color:#9ca3af;">Keine bevorstehenden Termine</li>
+        </ul>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Warteschlange -->
+  <div class="card p-5">
+    <div class="flex items-center justify-between mb-5">
+      <div class="queue-section-label">Warteschlange</div>
+      <button onclick="openAddToQueueModal()" class="btn-add">+ Kunde hinzufügen</button>
+    </div>
+    <ul id="queue-list" style="list-style:none;padding:0;margin:0;">
+      <li style="font-size:0.9rem;color:#9ca3af;">Noch keine Einträge</li>
+    </ul>
+  </div>
+
+  <!-- Popups -->
+  <div id="message-popup" class="popup">
+    <div id="message" class="message"></div>
+    <button id="undo-btn" onclick="undoLastAction()" class="ml-4 text-sm font-bold text-blue-600 hidden">↺ Rückgängig</button>
+  </div>
+  <div id="error-popup" class="popup">
+    <div id="error" class="error"></div>
+  </div>
+</div>
+
+<script>
+  let lastAction = null;
+  let popupTimeout = null;
+  let appointmentErrorMsgTimeout = null;
+  let queueErrorMsgTimeout = null;
+  let sidebarTimeout = null;
+  let currentAppointmentId = null;
+  const state = { calendar: null };
+
+  // ── FullCalendar ────────────────────────────────────────────
+  document.addEventListener("DOMContentLoaded", () => {
+    const calendarEl = document.getElementById("calendar");
+
+    const calendar = new FullCalendar.Calendar(calendarEl, {
+      locale: "de",
+      initialView: "timeGridWeek",
+      selectable: true,
+      editable: true,
+      eventOverlap: false,
+      nowIndicator: true,
+      allDaySlot: false,
+      slotMinTime: "00:00:00",
+      slotMaxTime: "24:00:00",
+      scrollTime: "06:00:00",
+      slotDuration: "00:15:00",
+      snapDuration: "00:05:00",
+
+      headerToolbar: {
+        left: "prev next today",
+        center: "title",
+        right: "dayGridMonth,timeGridWeek,timeGridDay"
+      },
+
+      buttonText: {
+        today: "Heute",
+        month: "Monat",
+        week: "Woche",
+        day: "Tag"
+      },
+
+      events: "/timeline",
+
+      eventDidMount(info) {
+        const statusMap = {
+          'pending': 'Ausstehend',
+          'no_show': 'Nicht erschienen',
+          'completed': 'Erledigt',
+          'confirmed': 'Bestätigt',
+          'assigned': 'Zugewiesen',
+          'in_progress': 'Dran'
+        };
+        const status = statusMap[info.event.extendedProps.status] || 'Unbekannt';
+        info.el.title = `Art: ${info.event.extendedProps.type}\nE-Mail: ${info.event.extendedProps.email || ''}\nTel: ${info.event.extendedProps.phone || ''}\nStatus: ${status}\nService: ${info.event.extendedProps.service}`;
+        if (info.event.extendedProps.status === 'completed') {
+          info.el.style.opacity = '0.5';
+          info.el.style.filter = 'grayscale(100%)';
+        }
+      },
+
+      dateClick(info) {
+        document.querySelectorAll('.btn-delete').forEach(btn => btn.style.display = 'none');
+        document.getElementById('customer_name').value = '';
+        document.getElementById('appointment_datetime').value = info.dateStr.slice(0, 16) || '';
+        document.getElementById('appointment_phone').value = '';
+        document.getElementById('appointment_email').value = '';
+        document.getElementById('appointment_notes').value = '';
+        openNewAppointmentModal();
+      },
+
+      eventClick(info) {
+        if (info.event.extendedProps.type === 'walkin') return;
+
+        const props = info.event.extendedProps;
+        currentAppointmentId = info.event.id;
+        document.getElementById('modal-title').textContent = 'Termin bearbeiten';
+        document.getElementById('appointment-form').setAttribute('onsubmit', `submitForm('/dashboard/appointments/${info.event.id}/edit'); return false;`);
+        document.getElementById('customer_name').value = info.event.title || '';
+        document.getElementById('appointment_datetime').value = info.event.startStr.slice(0, 16) || '';
+        document.getElementById('appointment_phone').value = props.phone || '';
+        document.getElementById('appointment_email').value = props.email || '';
+        document.getElementById('appointment_notes').value = props.notes || '';
+        document.getElementById('appointment_service').value = props.service || '';
+
+        if (!["completed", "no_show"].includes(info.event.extendedProps.status)) {
+          document.querySelectorAll('.btn-delete').forEach(btn => btn.style.display = 'block');
+        }
+
+        openNewAppointmentModal();
+      },
+
+      async eventDrop(info) {
+        const res = await fetch(`/dashboard/appointments/${info.event.id}/${info.event.extendedProps.type}/move`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ start: info.event.startStr.slice(0, 16) })
+        });
+
+        if (!res.ok) {
+          info.revert();
+          const data = await res.json().catch(() => null);
+          console.log(data?.error);
+          return;
+        }
+
+        state.calendar.refetchEvents();
+      },
+
+      async eventResize(info) {
+        const res = await fetch(`/dashboard/appointments/${info.event.id}/resize`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ start: info.event.startStr, end: info.event.endStr })
+        });
+
+        if (!res.ok) {
+          const data = await res.json().catch(() => null);
+          console.log(data?.error);
+          return;
+        }
+
+        state.calendar.refetchEvents();
+      },
+
+      eventsSet() {
+        refreshDashboard();
+        refreshQueue();
+        clearTimeout(sidebarTimeout);
+        sidebarTimeout = null;
+
+        scheduleNextUpdate();
+      }
+    });
+
+    state.calendar = calendar;
+    calendar.render();
+  });
+
+  // ── WebSocket ────────────────────────────────────────────────
+  const socket = io();
+
+  socket.on("connect", () => {
+     socket.emit("join_room", { room: "{{ room_id }}" });
+  });
+
+  socket.on("message", (data) => {
+    document.getElementById("message").textContent = data.message;
+    const popup = document.getElementById("message-popup");
+    if (popup && popupTimeout == null) {
+      popup.classList.add("show");
+      popupTimeout = setTimeout(() => {
+        popupTimeout = null;
+        popup.classList.remove("show")
+        }, 5000
+      );
+    }
+  });
+
+  socket.on("error", (data) => {
+    document.getElementById("error").textContent = data.error;
+    const popup = document.getElementById("error-popup");
+    if (popup && popupTimeout == null) {
+      popup.classList.add("show");
+      popupTimeout = setTimeout(() => {
+        popupTimeout = null;
+        popup.classList.remove("show")
+        }, 5000
+      );
+    }
+  });
+
+  // ── Actions ──────────────────────────────────────────────────
+  async function submitForm(actionUrl, type) {
+    const select = document.getElementById("appointment_service");
+    const hasServices = select && select.options.length > 1;
+
+    if (!hasServices) {
+      if (type === 'appointment') {
+        if (appointmentErrorMsgTimeout == null) {
+          document.getElementById("appointment-error-msg").classList.add("show");
+          appointmentErrorMsgTimeout = setTimeout(() => {
+            appointmentErrorMsgTimeout = null;
+            document.getElementById("appointment-error-msg").classList.remove("show")
+            }, 10000
+          );
+        }
+      } else {
+        if (queueErrorMsgTimeout == null) {
+          document.getElementById("queue-error-msg").classList.add("show");
+          queueErrorMsgTimeout = setTimeout(() => {
+            queueErrorMsgTimeout = null;
+            document.getElementById("queue-error-msg").classList.remove("show")
+            }, 10000
+          );
+        }
+      }
+      return;
+    }
+
+    let form;
+
+    if (actionUrl === '/dashboard/appointments') {
+      form = document.querySelector("#appointment-form");
+    } else if (actionUrl === '/dashboard/queue/add') {
+      form = document.querySelector("#queue-form");
+    } else {
+      form = document.querySelector("#appointment-form");
+    }
+
+    const formData = new FormData(form);
+    const res = await fetch(actionUrl, { method: "POST", body: formData });
+
+    if (res.ok) {
+      closeNewAppointmentModal();
+      closeAddToQueueModal();
+      state.calendar.refetchEvents();
+    } else {
+      const data = await res.json().catch(() => null);
+      console.log(data?.error);
+    }
+  }
+
+  async function scheduleNextUpdate() {
+    const next = (await getNextAppointments())[0];
+    const current = await getCurrentAppointments();
+    const now = new Date();
+
+   if (!next && !current.data) return;
+
+    let nextChange = null;
+
+    if (current.data && current.data.end) {
+        nextChange = new Date(current.data.end);
+    }
+
+    if (next && next.start && (!nextChange || new Date(next.start) < nextChange)) {
+        nextChange = new Date(next.start);
+    }
+
+    if (!nextChange) return;
+
+    const diff = nextChange - now;
+
+    sidebarTimeout = setTimeout(() => {
+      sidebarTimeout = null;
+      state.calendar.refetchEvents();
+    }, diff);
+  }
+
+  async function refreshQueue() {
+    const res = await fetch('/dashboard/queue/load', { method: "GET" });
+    if (!res.ok) {
+      const data = await res.json().catch(() => null);
+      console.log(data?.error);
+    }
+
+    const queue = await res.json();
+    renderQueue(queue);
+  }
+
+  async function removeFromQueue(id) {
+    const res = await fetch(`/dashboard/queue/${id}/remove`, { method: "DELETE" });
+
+    if (!res.ok) {
+      const data = await res.json().catch(() => null);
+      console.log(data?.error);
+      return;
+    }
+    state.calendar.refetchEvents();
+  }
+
+  function updateQueueCount(q_length) {
+    document.getElementById("stat-queue").textContent = q_length;
+  }
+
+  function renderQueue(queue) {
+    const statusMap = {'assigned': 'Wartet', in_progress: 'Dran', completed: 'Fertig', no_show: 'Nicht gekommen' };
+    const list = document.getElementById("queue-list");
+    list.innerHTML = "";
+
+    const filtered_queue = queue.filter(item => !['in_progress', 'no_show', 'completed'].includes(item.status));
+    updateQueueCount(filtered_queue.length);
+
+    if (!queue || queue.length === 0) {
+      list.innerHTML = `<li style="color:#9ca3af;font-size:0.9rem;">Keine Einträge</li>`;
+      return;
+    }
+
+    queue = queue.filter(item => item.status !== 'no_show' && item.status !== 'completed')
+
+    queue.forEach(item => {
+      const li = document.createElement("li");
+      li.className = "queue-item";
+      const isActive = item.status === 'in_progress';
+      li.innerHTML = `
+        <div class="queue-num${isActive ? ' active' : ''}">${item.position}</div>
+        <div style="flex:1;">
+          <div class="queue-name">${item.customer_name || 'Unbekannt'}</div>
+          <div class="queue-meta">${item.duration} min &nbsp;·&nbsp; ${item.service || 'Kein Service'}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <span class="${isActive ? 'queue-status-active' : 'queue-status-waiting'}">${statusMap[item.status]}</span>
+          <button onclick="removeFromQueue(${item.queue_id})" class="queue-remove-btn" aria-label="Entfernen">✕</button>
+        </div>
+      `;
+      list.appendChild(li);
+    });
+  }
+
+  async function refreshDashboard() {
+    const appointmentsToday =  await getAppointmentsToday();
+    document.getElementById('stat-today').textContent = appointmentsToday.length;
+    const pendingAppointments = appointmentsToday.filter(a => a.extendedProps.status !== 'completed');
+    document.getElementById('stat-today-pending').textContent = pendingAppointments.length;
+
+    let nextAppointments = (await getNextAppointments()).slice(0, 3);
+
+    const list = document.getElementById('next-appointments');
+    const currentAppointments = (await getCurrentAppointments()).data;
+
+    const avgWaitingTime = (await getAvgWaitingTime()).avg_wait;
+
+    if (!nextAppointments.length) {
+      list.innerHTML = '<li style="font-size:0.85rem;color:#9ca3af;">Keine bevorstehenden Termine</li>';
+    } else {
+      list.innerHTML = nextAppointments.map(event => {
+        const time = new Date(event.start).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+        const status = event.extendedProps.status;
+        return `
+          <li class="appt-item">
+            <span class="appt-time">${time}</span>
+            <div class="appt-info">
+              <div class="appt-name">${event.title}</div>
+              <div class="appt-svc">${event.extendedProps.service || 'Unbekannt'}</div>
+            </div>
+            ${event.extendedProps.type === "termin"
+              ? `<span class="${status === 'confirmed' ? 'badge-confirmed' : 'badge-pending'}">
+                   ${status === 'confirmed' ? 'Bestätigt' : 'Ausstehend'}
+                 </span>`
+              : `<span class="badge-pending">
+                   Wartet
+                 </span>`
+            }
+          </li>
+        `;
+      }).join('');
+    }
+
+    if (!currentAppointments) {
+      document.getElementById('current-name').textContent = 'Niemand';
+      document.getElementById('current-duration').textContent = '–';
+      document.getElementById('current-service').textContent = '–';
+      document.getElementById('current-avatar').textContent = '—';
+    } else {
+      const c = currentAppointments;
+      document.getElementById('current-name').textContent = c.title;
+      document.getElementById('current-duration').textContent = `${c.extendedProps.duration} Minuten` || '–';
+      document.getElementById('current-service').textContent = c.extendedProps.service || 'Unbekannt';
+      document.getElementById('current-avatar').textContent = c.title.charAt(0).toUpperCase() || '—';
+    }
+
+    const noShowBtn = document.getElementById('no-show-btn');
+    if (!currentAppointments) {
+      noShowBtn.style.display = 'none';
+    } else {
+      noShowBtn.style.display = 'block';
+    }
+
+    document.getElementById('stat-wait').innerText = avgWaitingTime;
+  }
+
+  async function deleteAppointment() {
+    const res = await fetch(`/dashboard/appointments/${currentAppointmentId}/delete`, { method: 'DELETE' });
+    if (res.ok) {
+      closeDelAppointmentModal();
+      closeNewAppointmentModal();
+      state.calendar.refetchEvents();
+    }
+  }
+
+  async function getAppointmentsToday() {
+    const res = await fetch("/dashboard/appointments/today");
+    const data = await res.json();
+    return data.appointments;
+  }
+
+  async function getNextAppointments() {
+    const res = await fetch("/dashboard/appointments/next");
+    const data = await res.json();
+    return data.appointments;
+  }
+
+  async function getCurrentAppointments() {
+    const res = await fetch("/dashboard/appointments/current");
+    const data = await res.json();
+    return data;
+  }
+
+  async function getAvgWaitingTime() {
+    const res = await fetch("/dashboard/queue/avg_waiting_time", { method: 'GET' });
+    const data = await res.json()
+    return data;
+  }
+
+  async function nextCustomer() {
+    const current = await getCurrentAppointments();
+    if (!current.data) return;
+
+    lastAction = { type: current.type, id: current.data.id, previousStatus: current.data.extendedProps.status };
+    showUndoPopup();
+
+    const res = await fetch(`/dashboard/appointments/${current.type}/${current.data.id}/update-status`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'completed' })
+    });
+
+    if (res.ok) {
+      state.calendar.refetchEvents();
+    }
+  }
+
+  async function customerNoShow(status) {
+    const current = await getCurrentAppointments();
+    if (!current.data) return;
+
+    lastAction = { type: current.type, id: current.data.id, previousStatus: current.data.extendedProps.status };
+
+    showUndoPopup();
+
+    const res = await fetch(`/dashboard/appointments/${current.type}/${current.data.id}/update-status`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status })
+    });
+
+    if (res.ok) {
+      state.calendar.refetchEvents();
+    }
+  }
+
+  async function undoLastAction() {
+    if (!lastAction) return;
+    await fetch(`/dashboard/appointments/${lastAction.type}/${lastAction.id}/update-status`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: lastAction.previousStatus })
+    });
+    state.calendar.refetchEvents();
+
+    lastAction = null;
+  }
+
+  function showUndoPopup() {
+    const undoBtn = document.getElementById("undo-btn");
+    undoBtn.classList.remove("hidden");
+    setTimeout(() => {
+      undoBtn.classList.add("hidden");
+      lastAction = null;
+    }, 5000);
+  }
+
+  function openNewAppointmentModal(status = false) {
+    if (status) {
+      document.querySelectorAll('.btn-delete').forEach(btn => btn.style.display = 'none');
+    }
+    document.getElementById("appointment-modal").hidden = false;
+  }
+
+  function closeNewAppointmentModal() {
+    const services = document.getElementById('appointment_service')
+
+    if (services) {
+      services.value = '';
+    }
+
+    document.getElementById('modal-title').textContent = 'Neuer Termin';
+    document.getElementById('appointment-form').setAttribute('onsubmit', `submitForm('/dashboard/appointments'); return false;`);
+    document.getElementById('customer_name').value = '';
+    document.getElementById('appointment_datetime').value = '';
+    document.getElementById('appointment_phone').value = '';
+    document.getElementById('appointment_email').value = '';
+    document.getElementById('appointment_notes').value = '';
+    document.getElementById("appointment-modal").hidden = true;
+  }
+
+  function openDelAppointmentModal() {
+    document.getElementById('delAppointmentModal').classList.remove('hidden');
+    document.getElementById('delAppointmentModal').classList.add('flex');
+  }
+
+  function closeDelAppointmentModal() {
+    document.getElementById('delAppointmentModal').classList.remove('flex');
+    document.getElementById('delAppointmentModal').classList.add('hidden');
+  }
+
+  function openAddToQueueModal() {
+    document.getElementById('queue-modal').classList.remove('hidden');
+    document.getElementById('queue-modal').classList.add('flex');
+  }
+
+  function closeAddToQueueModal() {
+    document.getElementById('queue-modal').classList.remove('flex');
+    document.getElementById('queue-modal').classList.add('hidden');
+
+    const services = document.getElementById('queue_service')
+
+    if (services) {
+      services.value = '';
+    }
+
+    document.getElementById('customer_name').value = '';
+    document.getElementById('queue_phone').value = '';
+
+  }
+
+  function toggleMenu() {
+    const sidebar = document.getElementById("sidebar");
+    sidebar.style.left = sidebar.style.left === "0px" ? "-250px" : "0px";
+  }
+</script>
+</body>
+</html>
