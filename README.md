@@ -41,12 +41,12 @@ Not a tutorial project — a complete SaaS system built from scratch.
 - 📲 QR check-in — scan, enter name & service, join instantly  
 - 👀 Live queue position — real-time position & estimated wait time on mobile  
 
-## 🚧 Planned / In development
+## 🚧 Planned (Premium tier)
 - 💳 Stripe deposit for no-show protection  
 - 📱 SMS notifications via Twilio  
 - 👥 Multi-staff support  
 - 📊 Analytics dashboard  
-- 🔁 Customer reactivation (Premium tier)
+- 🔁 Customer reactivation 
 
 ---
 
@@ -85,12 +85,12 @@ Once all logic is complete:
 
 # 📚 What I Learned
 - Full-stack architecture  
-- Real-time systems (WebSockets, lifecycle, race conditions)  
+- Real-time systems (WebSockets)  
 - Relational database design  
 - Timezone handling (UTC storage, naive vs. aware)  
-- SQLAlchemy ORM (models, relationships, joinedload, pooling)  
+- SQLAlchemy ORM (relationships)  
 - Authentication security  
-- Product thinking (competitor analysis: Fresha, Booksy, Shore)
+- Product thinking (competitor analysis: Fresha, Booksy)
 
 ---
 
