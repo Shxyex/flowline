@@ -10,11 +10,14 @@ import random
 import uuid
 from sqlalchemy import func
 from sqlalchemy.orm import joinedload
+from dotenv import load_dotenv
+import os
 
 from database_manager import Session, Provider, ProviderCredentials, ProviderService, Appointment, QueueEntry, User
 
+load_dotenv()
 app = Flask(__name__)
-app.secret_key = "supersecretkey0109"
+app.secret_key = os.getenv("SECRET_KEY")
 app.config['REMEMBER_COOKIE_DURATION'] = datetime.timedelta(days=30)
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
 bcrypt = Bcrypt(app)
