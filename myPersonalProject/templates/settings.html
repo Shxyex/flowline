@@ -859,7 +859,7 @@
         </div>
       </div>
 
-      <div class="section-card">
+      <form class="section-card" onsubmit="saveEmailReminderSettings(); return false;">
         <div class="section-header">
           <div class="section-header-icon"><i class="fa-regular fa-envelope"></i></div>
           <div>
@@ -871,7 +871,7 @@
           <div class="form-row-label">Terminerinnerung</div>
           <div class="form-row-value">
             <div class="toggle-wrap">
-              <label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label>
+              <label class="toggle"><input id="reminder24" type="checkbox" checked><span class="toggle-slider"></span></label>
               <span class="toggle-label">24 Stunden vor dem Termin</span>
             </div>
           </div>
@@ -880,7 +880,7 @@
           <div class="form-row-label">3-Stunden-Reminder</div>
           <div class="form-row-value">
             <div class="toggle-wrap">
-              <label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label>
+              <label class="toggle"><input id="reminder3" type="checkbox" checked><span class="toggle-slider"></span></label>
               <span class="toggle-label">3 Stunden vor dem Termin</span>
             </div>
           </div>
@@ -888,7 +888,7 @@
         <div class="section-footer">
           <button class="btn-save">Speichern</button>
         </div>
-      </div>
+      </form>
     </div>
 
     <div id="message-popup" class="popup">
@@ -918,6 +918,8 @@
     document.getElementById("category").value = data?.category
     document.getElementById("address").value = data?.address
     document.getElementById("email").value = data?.email
+    document.getElementById("reminder24").checked = data?.reminder_24h ? true : false
+    document.getElementById("reminder3").checked = data?.reminder_3h ? true : false
 
     data.services.forEach(service => {
       document.getElementById("services-list").innerHTML += `
@@ -1136,6 +1138,26 @@
       method: 'POST',
       body: formData
     })
+
+    if (!res.ok) {
+      const data = await res.json().catch(() => null);
+      console.log(data?.error);
+      return;
+    }
+  }
+
+  async function saveEmailReminderSettings() {
+    const reminder24 = document.getElementById("reminder24").checked;
+    const reminder3 = document.getElementById("reminder3").checked
+
+    const res = await fetch('/dashboard/settings/email_reminder_settings/save', {
+      method: 'POST',
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        "reminder_24h": reminder24,
+        "reminder_3h": reminder3
+      })
+    });
 
     if (!res.ok) {
       const data = await res.json().catch(() => null);

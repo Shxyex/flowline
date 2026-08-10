@@ -21,6 +21,7 @@ class Provider(Base):
     services = relationship("ProviderService", back_populates="provider")
     appointments = relationship("Appointment", back_populates="provider")
     queue_entries = relationship("QueueEntry", back_populates="provider")
+    settings = relationship("ProviderSettings", back_populates="provider")
 
 class ProviderCredentials(Base):
     __tablename__ = "provider_credentials"
@@ -60,6 +61,8 @@ class Appointment(Base):
     duration_minutes = Column(Integer, nullable=False)
     notes = Column(Text)
     status = Column(String(50), default="pending")
+    reminded_24h = Column(Boolean, default=False)
+    reminded_3h = Column(Boolean, default=False)
 
     provider = relationship("Provider",        back_populates="appointments")
     service = relationship("ProviderService", back_populates="appointments")
@@ -68,7 +71,7 @@ class QueueEntry(Base):
     __tablename__ = "queue_entries"
 
     id = Column(Integer, primary_key=True)
-    provider_id = Column(Integer, ForeignKey("providers.id"),         nullable=False)
+    provider_id = Column(Integer, ForeignKey("providers.id"), nullable=False)
     service_id = Column(Integer, ForeignKey("provider_services.id"), nullable=True)
     customer_name = Column(String(200))
     customer_phone = Column(String(50))
@@ -82,6 +85,19 @@ class QueueEntry(Base):
 
     provider = relationship("Provider", back_populates="queue_entries")
     service = relationship("ProviderService", back_populates="queue_entries")
+
+
+class ProviderSettings(Base):
+    __tablename__ = "provider_settings"
+
+    id = Column(Integer, primary_key=True)
+    provider_id = Column(Integer, ForeignKey("providers.id"), nullable=False)
+
+    reminder_24h = Column(Boolean, default=True)
+    reminder_3h = Column(Boolean, default=True)
+
+    provider = relationship("Provider", back_populates="settings")
+
 
 Base.metadata.create_all(engine)
 Session = sessionmaker(bind=engine)

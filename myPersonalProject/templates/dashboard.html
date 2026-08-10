@@ -786,7 +786,7 @@
         document.getElementById('appointment_phone').value = props.phone || '';
         document.getElementById('appointment_email').value = props.email || '';
         document.getElementById('appointment_notes').value = props.notes || '';
-        document.getElementById('appointment_service').value = props.service || '';
+        document.getElementById('appointment_service').value = props.service_id  || '';
 
         if (!["completed", "no_show"].includes(info.event.extendedProps.status)) {
           document.querySelectorAll('.btn-delete').forEach(btn => btn.style.display = 'block');

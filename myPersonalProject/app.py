@@ -12,14 +12,18 @@ from sqlalchemy import func
 from sqlalchemy.orm import joinedload
 from dotenv import load_dotenv
 import os
+import threading
+import time
+
 
 from database_manager import Session, Provider, ProviderCredentials, ProviderService, Appointment, QueueEntry, User
+from myPersonalProject.database_manager import ProviderSettings
 
 load_dotenv()
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY")
 app.config['REMEMBER_COOKIE_DURATION'] = datetime.timedelta(days=30)
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode="eventlet")
 bcrypt = Bcrypt(app)
 login_manager = LoginManager(app)
 login_manager.login_view = "provider_login_page"
@@ -112,6 +116,7 @@ def provider_register_submit():
         "password_repeat": confirm_password
     }
 
+    session_db = Session()
     try:
         if password != confirm_password:
             emit_to_user("error", {
@@ -119,11 +124,7 @@ def provider_register_submit():
             })
             return jsonify({"error": "Passwörter stimmen nicht überein."}), 400
 
-        session_db = Session()
-
         existing = session_db.query(ProviderCredentials).filter_by(email=email).first()
-
-        session_db.close()
 
         if existing:
             emit_to_user("error", {
@@ -136,6 +137,9 @@ def provider_register_submit():
     except Exception as e:
         emit_to_user("message", {"message": str(e)})
         return jsonify({"error": str(e)}), 500
+
+    finally:
+        session_db.close()
 
 @app.route("/register/provider/code", methods=["GET"])
 def register_provider_code_page():
@@ -278,6 +282,13 @@ def register_provider_code_verify():
     )
 
     session_db.add(new_credentials)
+    session_db.flush()
+
+    settings = ProviderSettings(
+        provider_id=new_provider.id,
+    )
+
+    session_db.add(settings)
     session_db.commit()
 
     session_db.close()
@@ -295,10 +306,10 @@ def onboarding():
         return render_template("onboarding.html")
 
     # POST
+    session_db = Session()
     try:
         data = request.get_json()
         services = data.get("services", [])
-        session_db = Session()
 
         if not services:
             emit_to_user("error", {"error": "Bitte füge mindestens einen Service hinzu, bevor du fortfährst."})
@@ -318,7 +329,6 @@ def onboarding():
             ))
 
         session_db.commit()
-        session_db.close()
 
         return jsonify({"redirect": "/dashboard"}), 200
 
@@ -328,6 +338,9 @@ def onboarding():
             "error": "Beim Erstellen des Termins ist ein Fehler aufgetreten.",
         })
         return jsonify({"error": str(e)}), 500
+
+    finally:
+        session_db.close()
 
 @app.route("/password-reset", methods=["POST", "GET"])
 def password_reset():
@@ -559,8 +572,8 @@ def appointments():
     service_id = request.form.get("appointment_service")
     notes = request.form.get("appointment_notes")
 
+    session_db = Session()
     try:
-        session_db = Session()
 
         service = session_db.query(ProviderService).filter_by(id=int(service_id)).first()
 
@@ -596,8 +609,6 @@ def appointments():
             session_db.add(new_appointment)
             session_db.commit()
 
-            session_db.close()
-
             emit_to_user("message", {
                 "message": "Termin wurde erfolgreich erstellt."
             })
@@ -614,6 +625,9 @@ def appointments():
             "error": "Beim Erstellen des Termins ist ein Fehler aufgetreten.",
         })
         return jsonify({"error": str(e)}), 500
+
+    finally:
+        session_db.close()
 
 @app.route("/dashboard/appointments/<int:appointment_id>/edit", methods=["POST", "GET"])
 @login_required
@@ -632,9 +646,8 @@ def edit_appointment(appointment_id):
     service_id = request.form.get("appointment_service")
     notes = request.form.get("appointment_notes")
 
+    session_db = Session()
     try:
-        session_db = Session()
-
         service = session_db.query(ProviderService).filter_by(id=int(service_id)).first()
 
         if not service:
@@ -687,7 +700,6 @@ def edit_appointment(appointment_id):
         appointment.status = current_status
 
         session_db.commit()
-        session_db.close()
 
         emit_to_user("message", {
             "message": "Termin erfolgreich aktualisiert."
@@ -700,6 +712,9 @@ def edit_appointment(appointment_id):
             "error": "Beim Aktualisieren des Termins ist ein Fehler aufgetreten."
         })
         return jsonify({"error": str(e)}), 500
+
+    finally:
+        session_db.close()
 
 def has_conflict(provider_id, start, end, exclude_appointment_id=None):
     session_db = Session()
@@ -758,9 +773,9 @@ def move_appointment(appointment_id, type):
         })
         return jsonify({"error": "Walk‑ins nicht verschiebbar."}), 400
 
-    try:
-        session_db = Session()
 
+    session_db = Session()
+    try:
         appointment = session_db.query(Appointment).filter_by(id=appointment_id, provider_id=current_user.id).first()
 
         if not appointment:
@@ -790,8 +805,6 @@ def move_appointment(appointment_id, type):
 
         session_db.commit()
 
-        session_db.close()
-
         emit_to_user("message", {
             "message": "Termin erfolgreich aktualisiert."
         })
@@ -804,6 +817,9 @@ def move_appointment(appointment_id, type):
         })
         return jsonify({"error": str(e)}), 500
 
+    finally:
+        session_db.close()
+
 @app.route("/dashboard/appointments/<int:appointment_id>/resize", methods=["PATCH"])
 @login_required
 def resize_appointment(appointment_id):
@@ -813,8 +829,8 @@ def resize_appointment(appointment_id):
     diff = int((end - start).total_seconds() / 60)
     now = datetime.datetime.now(datetime.timezone.utc).astimezone().replace(second=0, microsecond=0)
 
+    session_db = Session()
     try:
-        session_db = Session()
 
         appointment = session_db.query(Appointment).filter_by(
             id=appointment_id,
@@ -839,8 +855,6 @@ def resize_appointment(appointment_id):
 
         session_db.commit()
 
-        session_db.close()
-
         emit_to_user("message", {
             "message": "Termin erfolgreich aktualisiert."
         })
@@ -853,14 +867,16 @@ def resize_appointment(appointment_id):
         })
         return jsonify({"error": str(e)}), 500
 
+    finally:
+        session_db.close()
+
 @app.route("/dashboard/appointments/<int:appointment_id>/delete", methods=["DELETE"])
 @login_required
 def delete_appointment(appointment_id):
     now = datetime.datetime.now(datetime.timezone.utc).astimezone().replace(second=0, microsecond=0)
 
+    session_db = Session()
     try:
-        session_db = Session()
-
         appointment = session_db.query(Appointment).filter_by(
             id=appointment_id,
             provider_id=current_user.id
@@ -881,8 +897,6 @@ def delete_appointment(appointment_id):
         session_db.delete(appointment)
         session_db.commit()
 
-        session_db.close()
-
         emit_to_user("message", {
             "message": "Termin erfolgreich gelöscht."
         })
@@ -894,6 +908,9 @@ def delete_appointment(appointment_id):
             "error": "Termin konnte nicht gelöscht werden.",
         })
         return jsonify({"error": str(e)}), 500
+
+    finally:
+        session_db.close()
 
 
 @app.route("/dashboard/appointments/today", methods=["GET"])
@@ -1082,9 +1099,8 @@ def update_status(type, id):
     data = request.get_json()
     status = data.get("status")
 
+    session_db = Session()
     try:
-        session_db = Session()
-
         # 1. Termin oder Walk‑in laden
         if type == "termin":
             entry = session_db.query(Appointment).filter_by(
@@ -1121,8 +1137,6 @@ def update_status(type, id):
 
         session_db.commit()
 
-        session_db.close()
-
         emit_to_user("message", {"message": "Status aktualisiert."})
         return jsonify({"message": "Status aktualisiert"}), 200
 
@@ -1130,6 +1144,9 @@ def update_status(type, id):
         print(e)
         emit_to_user("error", {"error": "Ein Fehler ist aufgetreten."})
         return jsonify({"error": str(e)}), 500
+
+    finally:
+        session_db.close()
 
 
 @app.route("/dashboard/queue/add", methods=["POST"])
@@ -1140,9 +1157,8 @@ def add_to_queue():
     service_id = request.form.get("queue_service")
     created_at = datetime.datetime.now().strftime("%Y-%m-%dT%H:%M")
 
+    session_db = Session()
     try:
-        session_db = Session()
-
         service = session_db.query(ProviderService).filter_by(id=int(service_id)).first()
 
         if not service:
@@ -1173,8 +1189,6 @@ def add_to_queue():
         session_db.add(new_queue)
         session_db.commit()
 
-        session_db.close()
-
         emit_to_user("message", {
             "message": "Zur Warteschlange hinzugefügt"
         })
@@ -1188,13 +1202,16 @@ def add_to_queue():
         })
         return jsonify({"error": str(e)}), 500
 
+    finally:
+        session_db.close()
+
 @app.route("/dashboard/queue/load", methods=["GET"])
 @login_required
 def load_queue():
     now = datetime.datetime.now(datetime.timezone.utc).astimezone().replace(second=0, microsecond=0)
-    try:
-        session_db = Session()
 
+    session_db = Session()
+    try:
         queues = session_db.query(QueueEntry).filter_by(
             provider_id=current_user.id,
         ).order_by(QueueEntry.position.asc()).all()
@@ -1231,7 +1248,6 @@ def load_queue():
 
             session_db.commit()
 
-        session_db.close()
 
         return jsonify(queue), 200
 
@@ -1242,12 +1258,15 @@ def load_queue():
         })
         return jsonify({"error": str(e)}), 500
 
+    finally:
+        session_db.close()
+
 @app.route("/dashboard/queue/<int:queue_id>/remove", methods=["DELETE"])
 @login_required
 def remove_from_queue(queue_id):
-    try:
-        session_db = Session()
 
+    session_db = Session()
+    try:
         queue = session_db.query(QueueEntry).filter_by(
             id=queue_id,
             provider_id=current_user.id
@@ -1276,8 +1295,6 @@ def remove_from_queue(queue_id):
 
         session_db.commit()
 
-        session_db.close()
-
         emit_to_user("message",{
             "message": "Erfolgreich aus der Warteschlange entfernt."
         })
@@ -1290,11 +1307,15 @@ def remove_from_queue(queue_id):
         })
         return jsonify({"error": str(e)}), 500
 
+    finally:
+        session_db.close()
+
 @app.route("/dashboard/queue/avg_waiting_time", methods=["GET"])
 @login_required
 def calculate_avg_waiting_time():
     today = datetime.date.today()
 
+    session_db = Session()
     try:
         session_db = Session()
 
@@ -1304,8 +1325,6 @@ def calculate_avg_waiting_time():
             QueueEntry.start.isnot(None),
             QueueEntry.status.not_in(["no_show", "in_progress", "pending"])
         ).all()
-
-        session_db.close()
 
         if not queues:
             return jsonify({"avg_wait": 0})
@@ -1329,6 +1348,9 @@ def calculate_avg_waiting_time():
             "error": "Fehler beim Kalkulieren der durchschnittlichen Wartezeit."
         })
         return jsonify({"error": str(e)}), 500
+
+    finally:
+        session_db.close()
 
 # <--- Für die Timeline --->
 
@@ -1476,6 +1498,8 @@ def find_free_slot(start_time, duration, appointments, timeline):
 
 @app.route("/timeline")
 def get_timeline():
+
+    session_db = Session()
     try:
         provider_id = current_user.id
         now = datetime.datetime.now(datetime.timezone.utc).astimezone().replace(second=0, microsecond=0)
@@ -1491,8 +1515,6 @@ def get_timeline():
         events.sort(key=lambda x: x["start"])
 
         calendar_events = []
-
-        session_db = Session()
 
         for item in events:
             if item["type"] == "termin" and item["status"] in ("pending", "confirmed", "in_progress"):
@@ -1580,6 +1602,7 @@ def get_timeline():
                     "extendedProps": {
                         "type": "termin",
                         "service": service.name,
+                        "service_id": service.id,
                         "duration": item["duration"],
                         "status": item["status"],
                         "email": item["email"],
@@ -1588,13 +1611,14 @@ def get_timeline():
                     }
                 })
 
-        session_db.close()
-
         return jsonify(calendar_events)
 
     except Exception as e:
         print("TIMELINE ERROR:", e)
         return jsonify({"error": str(e)}), 500
+
+    finally:
+        session_db.close()
 
 @app.route("/logout", methods=["GET"])
 @login_required
@@ -1613,9 +1637,8 @@ def settings():
 def delete_account():
     provider_id = current_user.id
 
+    session_db = Session()
     try:
-        session_db = Session()
-
         session_db.query(Appointment).filter_by(provider_id=provider_id).delete()
         session_db.query(QueueEntry).filter_by(provider_id=provider_id).delete()
         session_db.query(ProviderService).filter_by(provider_id=provider_id).delete()
@@ -1624,8 +1647,6 @@ def delete_account():
         session_db.commit()
 
         session_db.commit()
-
-        session_db.close()
 
         logout_user()
         session.clear()
@@ -1639,12 +1660,15 @@ def delete_account():
         })
         return jsonify({"error": str(e)}), 500
 
+    finally:
+        session_db.close()
+
 @app.route("/dashboard/settings/get_provider_profile", methods=["GET"])
 @login_required
 def get_provider_profile():
-    try:
-        session_db = Session()
 
+    session_db = Session()
+    try:
         provider = session_db.query(Provider).filter_by(id=current_user.id).first()
 
         credentials = session_db.query(ProviderCredentials).filter_by(
@@ -1655,15 +1679,19 @@ def get_provider_profile():
             provider_id=current_user.id
         ).all()
 
+        settings = session_db.query(ProviderSettings).filter_by(
+            provider_id=current_user.id
+        ).first()
+
         data = {
             "business_name": provider.business_name,
             "category": provider.category,
             "address": provider.address,
             "email": credentials.email,
-            "services": [serialize_service(s) for s in services]
+            "services": [serialize_service(s) for s in services],
+            "reminder_24h": settings.reminder_24h,
+            "reminder_3h": settings.reminder_3h
         }
-
-        session_db.close()
 
         return jsonify(data), 200
 
@@ -1673,6 +1701,9 @@ def get_provider_profile():
             "error": "Beim Laden der Anbieterdaten ist ein Fehler aufgetreten."
         })
         return jsonify({"error": str(e)}), 500
+
+    finally:
+        session_db.close()
 
 def serialize_service(s):
     return {
@@ -1689,6 +1720,7 @@ def change_password_check():
     new_password = request.form.get("new_password")
     new_password_repeat = request.form.get("new_password_repeat")
 
+    session_db = Session()
     try:
         if not current_password or not new_password or not new_password_repeat:
             emit_to_user("error", {
@@ -1707,8 +1739,6 @@ def change_password_check():
         credentials = session_db.query(ProviderCredentials).filter_by(
             provider_id=current_user.id
         ).first()
-
-        session_db.close()
 
         if not bcrypt.check_password_hash(credentials.password_hash, current_password):
             emit_to_user("error", {
@@ -1732,6 +1762,9 @@ def change_password_check():
             "error": "Es ist ein Fehler aufgetreten. Bitte versuchen Sie es später erneut."
         })
         return jsonify({"error": str(e)}), 500
+
+    finally:
+        session_db.close()
 
 @app.route("/dashboard/settings/change_password/code", methods=["GET"])
 @login_required
@@ -1882,14 +1915,13 @@ def save_business_info():
     category = request.form.get("category")
     address = request.form.get("address")
 
+    session_db = Session()
     try:
         if not business_name or not category or not address:
             emit_to_user("error", {
                 "error": "Bitte füllen Sie alle erforderlichen Felder aus."
             })
             return jsonify({"error": "Felder fehlen."}), 400
-
-        session_db = Session()
 
         provider = session_db.query(Provider).filter_by(
             id=current_user.id
@@ -1911,8 +1943,6 @@ def save_business_info():
 
         session_db.commit()
 
-        session_db.close()
-
         emit_to_user("message", {
             "message": "Ihre Salon-Informationen wurden erfolgreich gespeichert."
         })
@@ -1926,17 +1956,20 @@ def save_business_info():
         })
         return jsonify({"error": str(e)}), 500
 
+    finally:
+        session_db.close()
+
 @app.route("/dashboard/settings/update_email/code/send", methods=["POST"])
 @login_required
 async def update_email_send_code():
     email = request.form.get("email")
-
 
     SMTP_SERVER = "smtp.gmail.com"
     SMTP_PORT = 587
     YOUR_EMAIL = "shmidtalex0109@gmail.com"
     YOUR_APP_PASSWORD = "zrinpxisbhrxsehe"
 
+    session_db = Session()
     try:
         # Wenn keine E-Mail im POST → Resend → Session verwenden
         if not email:
@@ -1947,13 +1980,9 @@ async def update_email_send_code():
                 })
                 return jsonify({"error": "E-Mail fehlt."}), 400
 
-        session_db = Session()
-
         provider = session_db.query(ProviderCredentials).filter_by(
             provider_id=current_user.id
         ).first()
-
-        session_db.close()
 
         if provider.email == email:
             emit_to_user("error", {
@@ -2046,6 +2075,8 @@ Das Flowline‑Team
         })
         return jsonify({"error": str(e)}), 500
 
+    finally:
+        session_db.close()
 
 @app.route("/dashboard/settings/update_email/code", methods=["GET"])
 @login_required
@@ -2111,9 +2142,8 @@ def save_services():
     data = request.get_json()
     services = data.get("services", [])
 
+    session_db = Session()
     try:
-        session_db = Session()
-
         session_db.query(ProviderService).filter_by(
             provider_id=current_user.id
         ).delete()
@@ -2132,7 +2162,6 @@ def save_services():
             ))
 
         session_db.commit()
-        session_db.close()
 
         if not services:
             emit_to_user("message", {"message": "Services erfolgreich gelöscht."})
@@ -2148,5 +2177,168 @@ def save_services():
         })
         return jsonify({"error": str(e)}), 500
 
+    finally:
+        session_db.close()
+
+def reminder_worker():
+    while True:
+        session_db = Session()
+        try:
+            now = datetime.datetime.now(datetime.timezone.utc)
+            in_24h = now + datetime.timedelta(hours=24)
+            in_3h = now + datetime.timedelta(hours=3)
+
+
+            appointments = session_db.query(Appointment).filter(
+                Appointment.customer_email != None,
+                Appointment.customer_email != "",
+                Appointment.status.in_(["pending", "confirmed"])
+            ).all()
+
+            for a in appointments:
+                settings = session_db.query(ProviderSettings).filter_by(
+                    provider_id=a.provider_id
+                ).first()
+
+                if not settings:
+                    continue
+
+                start = a.start.astimezone()
+
+                # 24h Erinnerung – Fenster von 1 Minute
+                if settings.reminder_24h:
+                    diff_24 = abs((start - in_24h).total_seconds())
+                    if diff_24 < 60 and not a.reminded_24h:
+                        send_reminder_email(a, "24h")
+                        a.reminded_24h = True
+
+                # 3h Erinnerung – Fenster von 1 Minute
+                if settings.reminder_3h:
+                    diff_3 = abs((start - in_3h).total_seconds())
+                    if diff_3 < 60 and not a.reminded_3h:
+                        send_reminder_email(a, "3h")
+                        a.reminded_3h = True
+
+        except Exception as e:
+            print("REMINDER ERROR:", e)
+
+        finally:
+            session_db.close()
+
+        time.sleep(60)
+
+def send_reminder_email(appointment, timing):
+    YOUR_EMAIL = "shmidtalex0109@gmail.com"
+    YOUR_APP_PASSWORD = "zrinpxisbhrxsehe"
+
+    if timing == "24h":
+        subject = "Erinnerung: Dein Termin morgen – Flowline"
+        zeit_text = "morgen"
+    else:
+        subject = "Erinnerung: Dein Termin in 3 Stunden – Flowline"
+        zeit_text = "in 3 Stunden"
+
+    start_local = appointment.start.replace(tzinfo=datetime.timezone.utc).astimezone()
+    uhrzeit = start_local.strftime("%H:%M")
+    datum = start_local.strftime("%d.%m.%Y")
+
+    text_fallback = (f'''
+Hallo {appointment.customer_name},
+
+dein Termin ist {zeit_text}.
+
+Datum: {datum}
+Uhrzeit: {uhrzeit} Uhr
+Service: {appointment.service.name if appointment.service else "–"}
+
+Falls du nicht kommen kannst, melde dich bitte rechtzeitig.
+
+Flowline – {YOUR_EMAIL}
+''')
+
+    message = f'''
+<html><body style="margin:0;padding:0;background:#f0f2ee;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="padding:40px 20px;">
+<tr><td align="center">
+  <table width="560" cellpadding="0" cellspacing="0" style="background:white;border-radius:16px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.06);">
+    <tr><td style="background:#2d6a4f;padding:28px 40px;">
+      <span style="font-size:20px;font-weight:700;color:white;">Flowline</span>
+    </td></tr>
+    <tr><td style="padding:40px;">
+      <p style="font-size:14px;color:#6b7280;margin:0 0 24px;">Hallo {appointment.customer_name},</p>
+      <h1 style="font-size:22px;font-weight:700;color:#111827;margin:0 0 12px;">Dein Termin ist {zeit_text}</h1>
+      <p style="font-size:14px;color:#6b7280;line-height:1.6;margin:0 0 32px;">Wir erinnern dich an deinen bevorstehenden Termin.</p>
+      <div style="background:#f0f2ee;border-radius:12px;padding:24px;margin:0 0 32px;">
+        <p style="font-size:14px;color:#374151;margin:0 0 8px;"><strong>📅 Datum:</strong> {datum}</p>
+        <p style="font-size:14px;color:#374151;margin:0 0 8px;"><strong>🕐 Uhrzeit:</strong> {uhrzeit} Uhr</p>
+        <p style="font-size:14px;color:#374151;margin:0;"><strong>✂️ Service:</strong> {appointment.service.name if appointment.service else "–"}</p>
+      </div>
+      <p style="font-size:12px;color:#9ca3af;line-height:1.6;margin:0;">Falls du den Termin nicht wahrnehmen kannst, melde dich bitte rechtzeitig.<br>Bei Fragen erreichst du uns unter <a href="mailto:{YOUR_EMAIL}" style="color:#2d6a4f;">{YOUR_EMAIL}</a>.</p>
+    </td></tr>
+    <tr><td style="background:#f9fafb;padding:20px 40px;border-top:1px solid #f3f4f6;">
+      <p style="font-size:12px;color:#9ca3af;margin:0;">© 2026 Flowline</p>
+    </td></tr>
+  </table>
+</td></tr>
+</table>
+</body></html>
+'''
+
+    msg = EmailMessage()
+    msg["Subject"] = subject
+    msg["From"] = YOUR_EMAIL
+    msg["To"] = appointment.customer_email
+    msg.set_content(text_fallback)
+    msg.add_alternative(message, subtype='html')
+
+    with smtplib.SMTP("smtp.gmail.com", 587) as server:
+        server.starttls()
+        server.login(YOUR_EMAIL, YOUR_APP_PASSWORD)
+        server.send_message(msg)
+
+
+@app.route("/dashboard/settings/email_reminder_settings/save", methods=["POST"])
+@login_required
+def save_email_reminder_settings():
+    data = request.get_json()
+    reminder_24h = data["reminder_24h"]
+    reminder_3h = data["reminder_3h"]
+
+    session_db = Session()
+
+    try:
+        settings = session_db.query(ProviderSettings).filter_by(
+            provider_id=current_user.id
+        ).first()
+
+        if not settings:
+            settings = ProviderSettings(provider_id=current_user.id)
+            session_db.add(settings)
+
+        settings.reminder_24h = reminder_24h
+        settings.reminder_3h = reminder_3h
+
+        session_db.commit()
+        session_db.close()
+
+        emit_to_user("message", {
+            "message": "Einstellungen erfolgreich gespeichert."
+        })
+        return jsonify({"message": "Einstellungen erfolgreich gespeichert."}), 200
+
+
+    except Exception as e:
+        print(e)
+        emit_to_user("error", {
+            "error": "Etwas ist schiefgelaufen. Deine Änderungen wurden nicht gespeichert."
+        })
+        return jsonify({"error": str(e)}), 500
+
+    finally:
+        session_db.close()
+
+reminder_thread = threading.Thread(target=reminder_worker, daemon=True)
+reminder_thread.start()
+
 if __name__ == "__main__":
-    socketio.run(app, use_reloader=True, debug=True, allow_unsafe_werkzeug=True, port=6060)
+    socketio.run(app, use_reloader=True, debug=True, port=6060)
