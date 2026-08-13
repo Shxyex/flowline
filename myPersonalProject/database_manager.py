@@ -96,6 +96,17 @@ class ProviderSettings(Base):
     reminder_24h = Column(Boolean, default=True)
     reminder_3h = Column(Boolean, default=True)
 
+    weekday_open = Column(String, default="06:00")
+    weekday_close = Column(String, default="00:00")
+
+    saturday_open = Column(String, default="06:00")
+    saturday_close = Column(String, default="00:00")
+
+    sunday_closed = Column(Boolean, default=False)
+
+    queue_enabled = Column(Boolean, default=True)
+    queue_max_length = Column(Integer, default=20)
+
     provider = relationship("Provider", back_populates="settings")
 
 

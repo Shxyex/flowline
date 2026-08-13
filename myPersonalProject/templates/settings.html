@@ -520,35 +520,36 @@
         </div>
       </form>
 
-      <div class="section-card">
+      <form class="section-card" onsubmit="saveOpeningHours(); return false;">
         <div class="section-header">
           <div class="section-header-icon"><i class="fa-regular fa-clock"></i></div>
           <div>
             <div class="section-title">Öffnungszeiten</div>
             <div class="section-desc">Wann ist dein Salon geöffnet?</div>
+            <p class="section-desc">Hinweis: Die Schließzeit kann maximal 00:00 Uhr betragen.</p>
           </div>
         </div>
         <div class="form-row">
           <div class="form-row-label">Montag – Freitag</div>
           <div class="form-row-value" style="display:flex;gap:10px;align-items:center;">
-            <input type="time" value="06:00" style="width:120px;">
+            <input type="time" id="weekday_open" value="6:00" style="width:120px;">
             <span style="color:#9ca3af;font-size:13px;">bis</span>
-            <input type="time" value="24:00" style="width:120px;">
+            <input type="time" id="weekday_close" value="00:00" style="width:120px;">
           </div>
         </div>
         <div class="form-row">
           <div class="form-row-label">Samstag</div>
           <div class="form-row-value" style="display:flex;gap:10px;align-items:center;">
-            <input type="time" value="09:00" style="width:120px;">
+            <input type="time" id="saturday_open" value="06:00" style="width:120px;">
             <span style="color:#9ca3af;font-size:13px;">bis</span>
-            <input type="time" value="15:00" style="width:120px;">
+            <input type="time" id="saturday_close" value="00:00" style="width:120px;">
           </div>
         </div>
         <div class="form-row">
           <div class="form-row-label">Sonntag</div>
           <div class="form-row-value">
             <div class="toggle-wrap">
-              <label class="toggle"><input type="checkbox"><span class="toggle-slider"></span></label>
+              <label class="toggle"><input type="checkbox" id="sunday_closed"><span class="toggle-slider"></span></label>
               <span class="toggle-label" style="color:#9ca3af;">Geschlossen</span>
             </div>
           </div>
@@ -556,7 +557,7 @@
         <div class="section-footer">
           <button class="btn-save">Speichern</button>
         </div>
-      </div>
+      </form>
     </div>
 
     <!-- Account -->
@@ -776,7 +777,7 @@
         </div>
       </div>
 
-      <div class="section-card">
+      <form class="section-card" onsubmit="saveQueueSettings(); return false;">
         <div class="section-header">
           <div class="section-header-icon"><i class="fa-solid fa-gear"></i></div>
           <div>
@@ -788,31 +789,22 @@
           <div class="form-row-label">Walk-ins erlaubt</div>
           <div class="form-row-value">
             <div class="toggle-wrap">
-              <label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label>
+              <label class="toggle"><input id="queue_enabled" type="checkbox" checked><span class="toggle-slider"></span></label>
               <span class="toggle-label">Kunden können sich über QR-Code eintragen</span>
-            </div>
-          </div>
-        </div>
-        <div class="form-row">
-          <div class="form-row-label">Service auswählen</div>
-          <div class="form-row-value">
-            <div class="toggle-wrap">
-              <label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label>
-              <span class="toggle-label">Kunden wählen ihren Service selbst aus</span>
             </div>
           </div>
         </div>
         <div class="form-row">
           <div class="form-row-label">Max. Warteschlange</div>
           <div class="form-row-value">
-            <input type="number" value="20" style="width:100px;" min="1" max="100">
+            <input id="queue_max_length" type="number" value="20" style="width:100px;" min="1" max="100">
             <div class="hint">Ab dieser Anzahl können sich keine neuen Kunden mehr eintragen.</div>
           </div>
         </div>
         <div class="section-footer">
           <button class="btn-save">Speichern</button>
         </div>
-      </div>
+      </form>
     </div>
 
     <!-- Benachrichtigungen -->
@@ -914,12 +906,19 @@
 
     const data = await res.json().catch(() => null)
 
-    document.getElementById("business_name").value = data?.business_name
-    document.getElementById("category").value = data?.category
-    document.getElementById("address").value = data?.address
-    document.getElementById("email").value = data?.email
-    document.getElementById("reminder24").checked = data?.reminder_24h ? true : false
-    document.getElementById("reminder3").checked = data?.reminder_3h ? true : false
+    document.getElementById("business_name").value = data?.business_name;
+    document.getElementById("category").value = data?.category;
+    document.getElementById("address").value = data?.address;
+    document.getElementById("email").value = data?.email;
+    document.getElementById("reminder24").checked = data?.reminder_24h;
+    document.getElementById("reminder3").checked = data?.reminder_3h;
+    document.getElementById("weekday_open").value = data?.weekday_open;
+    document.getElementById("weekday_close").value = data?.weekday_close;
+    document.getElementById("saturday_open").value = data?.saturday_open;
+    document.getElementById("saturday_close").value = data?.saturday_close;
+    document.getElementById("sunday_closed").checked = data?.sunday_closed;
+    document.getElementById("queue_enabled").checked = data?.queue_enabled;
+    document.getElementById("queue_max_length").value = data?.queue_max_length;
 
     data.services.forEach(service => {
       document.getElementById("services-list").innerHTML += `
@@ -1165,7 +1164,65 @@
       return;
     }
   }
-</script>
 
+  async function saveOpeningHours() {
+    const weekday_open = document.getElementById("weekday_open").value;
+    let weekday_close = document.getElementById("weekday_close").value;
+
+    const saturday_open = document.getElementById("saturday_open").value;
+    let saturday_close = document.getElementById("saturday_close").value;
+
+    const sunday_closed = document.getElementById("sunday_closed").checked;
+
+
+    if (weekday_close <= weekday_open) {
+      weekday_close = "00:00";
+      document.getElementById("weekday_close").value = "00:00";
+    }
+
+    if (saturday_close <= saturday_open) {
+      saturday_close = "00:00";
+      document.getElementById("saturday_close").value = "00:00";
+    }
+
+    const res = await fetch('/dashboard/settings/opening_hours/save', {
+      method: 'POST',
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        "weekday_open": weekday_open,
+        "weekday_close": weekday_close,
+        "saturday_open": saturday_open,
+        "saturday_close": saturday_close,
+        "sunday_closed": sunday_closed
+      })
+    });
+
+    if (!res.ok) {
+      const data = await res.json().catch(() => null);
+      console.log(data?.error);
+      return;
+    }
+  }
+
+  async function saveQueueSettings() {
+    const queue_enabled = document.getElementById("queue_enabled").checked;
+    const queue_max_length = document.getElementById("queue_max_length").value;
+
+    const res = await fetch('/dashboard/settings/queue_settings/save', {
+      method: 'POST',
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        "queue_enabled": queue_enabled,
+        "queue_max_length": queue_max_length
+      })
+    });
+
+    if (!res.ok) {
+      const data = await res.json().catch(() => null);
+      console.log(data?.error);
+      return;
+    }
+  }
+</script>
 </body>
 </html>

@@ -15,15 +15,13 @@ import os
 import threading
 import time
 
-
-from database_manager import Session, Provider, ProviderCredentials, ProviderService, Appointment, QueueEntry, User
-from myPersonalProject.database_manager import ProviderSettings
+from database_manager import Session, Provider, ProviderCredentials, ProviderService, ProviderSettings, Appointment, QueueEntry, User
 
 load_dotenv()
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY")
 app.config['REMEMBER_COOKIE_DURATION'] = datetime.timedelta(days=30)
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode="eventlet")
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
 bcrypt = Bcrypt(app)
 login_manager = LoginManager(app)
 login_manager.login_view = "provider_login_page"
@@ -1171,6 +1169,16 @@ def add_to_queue():
             provider_id=current_user.id,
         ).all()
 
+        settings = session_db.query(ProviderSettings).filter_by(
+            provider_id=current_user.id,
+        ).first()
+
+        if len(queues) >= settings.queue_max_length:
+            emit_to_user("error", {
+                "error": "Die Warteschlange ist voll. Neue Kunden können sich momentan nicht eintragen."
+            })
+            return jsonify({"error": "Warteschlange voll"}), 200
+
         max_position = max(q.position for q in queues) if queues else 0
 
         new_position = max_position + 1
@@ -1690,8 +1698,16 @@ def get_provider_profile():
             "email": credentials.email,
             "services": [serialize_service(s) for s in services],
             "reminder_24h": settings.reminder_24h,
-            "reminder_3h": settings.reminder_3h
+            "reminder_3h": settings.reminder_3h,
+            "weekday_open": settings.weekday_open,
+            "weekday_close": settings.weekday_close,
+            "saturday_open": settings.saturday_open,
+            "saturday_close": settings.saturday_close,
+            "sunday_closed": settings.sunday_closed,
+            "queue_enabled": settings.queue_enabled,
+            "queue_max_length": settings.queue_max_length
         }
+
 
         return jsonify(data), 200
 
@@ -2337,8 +2353,95 @@ def save_email_reminder_settings():
     finally:
         session_db.close()
 
+
+@app.route("/dashboard/settings/opening_hours/save", methods=["POST"])
+@login_required
+def save_opening_hours_settings():
+    data = request.get_json()
+    weekday_open = data["weekday_open"]
+    weekday_close = data["weekday_close"]
+    saturday_open = data["saturday_open"]
+    saturday_close = data["saturday_close"]
+    sunday_closed= data["sunday_closed"]
+
+    session_db = Session()
+
+    try:
+        settings = session_db.query(ProviderSettings).filter_by(
+            provider_id=current_user.id
+        ).first()
+
+        if not settings:
+            settings = ProviderSettings(provider_id=current_user.id)
+            session_db.add(settings)
+
+        settings.weekday_open = weekday_open
+        settings.weekday_close = weekday_close
+        settings.saturday_open = saturday_open
+        settings.saturday_close = saturday_close
+        settings.sunday_closed = sunday_closed
+
+        session_db.commit()
+        session_db.close()
+
+        emit_to_user("message", {
+            "message": "Einstellungen erfolgreich gespeichert."
+        })
+        return jsonify({"message": "Einstellungen erfolgreich gespeichert."}), 200
+
+
+    except Exception as e:
+        print(e)
+        emit_to_user("error", {
+            "error": "Etwas ist schiefgelaufen. Deine Änderungen wurden nicht gespeichert."
+        })
+        return jsonify({"error": str(e)}), 500
+
+    finally:
+        session_db.close()
+
+@app.route("/dashboard/settings/queue_settings/save", methods=["POST"])
+@login_required
+def save_queue_settings():
+    data = request.get_json()
+    queue_enabled = data["queue_enabled"]
+    queue_max_length = data["queue_max_length"]
+
+    session_db = Session()
+
+    try:
+        settings = session_db.query(ProviderSettings).filter_by(
+            provider_id=current_user.id
+        ).first()
+
+        if not settings:
+            settings = ProviderSettings(provider_id=current_user.id)
+            session_db.add(settings)
+
+        settings.queue_enabled = queue_enabled
+        settings.queue_max_length = queue_max_length
+
+        session_db.commit()
+        session_db.close()
+
+        emit_to_user("message", {
+            "message": "Einstellungen erfolgreich gespeichert."
+        })
+        return jsonify({"message": "Einstellungen erfolgreich gespeichert."}), 200
+
+
+    except Exception as e:
+        print(e)
+        emit_to_user("error", {
+            "error": "Etwas ist schiefgelaufen. Deine Änderungen wurden nicht gespeichert."
+        })
+        return jsonify({"error": str(e)}), 500
+
+    finally:
+        session_db.close()
+
 reminder_thread = threading.Thread(target=reminder_worker, daemon=True)
 reminder_thread.start()
 
 if __name__ == "__main__":
-    socketio.run(app, use_reloader=True, debug=True, port=6060)
+    socketio.run(app, use_reloader=True, debug=True, allow_unsafe_werkzeug=True, port=6060)

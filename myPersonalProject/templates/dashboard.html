@@ -408,6 +408,7 @@
       z-index: 100;
     }
     .popup.show { transform: translateX(0); }
+
     .message {
       background: #e6ffe6;
       color: #006600;
@@ -426,6 +427,7 @@
       font-size: 15px;
       font-weight: 500;
     }
+
     #sidebar a {
       display: flex;
       align-items: center;
@@ -685,7 +687,14 @@
   </div>
 
   <!-- Warteschlange -->
-  <div class="card p-5">
+  <div class="card p-5" id="queue-section">
+    <div id="walkin-disabled-banner" style="display:none;align-items:center;gap:10px;background:#fef2f2;border:1.5px solid #fecaca;border-radius:8px;padding:10px 14px;margin-bottom:16px;">
+        <span style="font-size:16px;">⚠️</span>
+        <span style="font-size:13px;color:#991b1b;">
+            Warteschlange ist deaktiviert.
+            <a href="/dashboard/settings#pane-queue" style="color:#991b1b;font-weight:700;text-decoration:underline;">Einstellungen → Queue QR-Code → Einstellung ändern</a>
+        </span>
+    </div>
     <div class="flex items-center justify-between mb-5">
       <div class="queue-section-label">Warteschlange</div>
       <button onclick="openAddToQueueModal()" class="btn-add">+ Kunde hinzufügen</button>
@@ -712,12 +721,30 @@
   let queueErrorMsgTimeout = null;
   let sidebarTimeout = null;
   let currentAppointmentId = null;
+  let walkinEnabled = true;
   const state = { calendar: null };
 
-  // ── FullCalendar ────────────────────────────────────────────
-  document.addEventListener("DOMContentLoaded", () => {
-    const calendarEl = document.getElementById("calendar");
+  function normalizeTime(close) {
+    if (close === "00:00") return "23:59";
+    return close;
+  }
 
+  // ── FullCalendar ────────────────────────────────────────────
+  document.addEventListener("DOMContentLoaded", async () => {
+    const res = await fetch("/dashboard/settings/get_provider_profile");
+    const data = await res.json();
+
+    walkinEnabled = data.queue_enabled;
+
+    if (!walkinEnabled) {
+      document.getElementById("queue-section").style.opacity = "0.4";
+      document.getElementById("walkin-disabled-banner").style.display = "flex";
+    }
+
+    const weekday_close = normalizeTime(data.weekday_close);
+    const saturday_close = normalizeTime(data.saturday_close);
+
+    const calendarEl = document.getElementById("calendar");
     const calendar = new FullCalendar.Calendar(calendarEl, {
       locale: "de",
       initialView: "timeGridWeek",
@@ -726,11 +753,13 @@
       eventOverlap: false,
       nowIndicator: true,
       allDaySlot: false,
-      slotMinTime: "00:00:00",
-      slotMaxTime: "24:00:00",
-      scrollTime: "06:00:00",
+      slotMinTime: data.weekday_open + ":00",
+      slotMaxTime: weekday_close,
+      scrollTime: data.weekday_open + ":00",
       slotDuration: "00:15:00",
       snapDuration: "00:05:00",
+      hiddenDays: data.sunday_closed ? [0] : [],
+
 
       headerToolbar: {
         left: "prev next today",
@@ -743,6 +772,15 @@
         month: "Monat",
         week: "Woche",
         day: "Tag"
+      },
+
+      datesSet(info) {
+        const day = info.start.getDay();
+
+        if (day === 6) {
+          calendar.setOption("slotMinTime", data.saturday_open + ":00");
+          calendar.setOption("slotMaxTime", saturday_close);
+        }
       },
 
       events: "/timeline",
@@ -1201,6 +1239,8 @@
   }
 
   function openAddToQueueModal() {
+    if (!walkinEnabled) return;
+
     document.getElementById('queue-modal').classList.remove('hidden');
     document.getElementById('queue-modal').classList.add('flex');
   }
