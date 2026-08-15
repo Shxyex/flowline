@@ -15,7 +15,7 @@ import os
 import threading
 import time
 
-from database_manager import Session, Provider, ProviderCredentials, ProviderService, ProviderSettings, Appointment, QueueEntry, User
+from database_manager import Session, Provider, ProviderCredentials, ProviderService, ProviderSettings, Appointment, QueueEntry, ProviderSubscription, ProviderStaff, User
 
 load_dotenv()
 app = Flask(__name__)
@@ -160,8 +160,8 @@ def register_provider_code_send():
 
     SMTP_SERVER = "smtp.gmail.com"
     SMTP_PORT = 587
-    YOUR_EMAIL = "shmidtalex0109@gmail.com"
-    YOUR_APP_PASSWORD = "zrinpxisbhrxsehe"
+    YOUR_EMAIL = os.getenv("SMTP_EMAIL")
+    YOUR_APP_PASSWORD = os.getenv("SMTP_PASSWORD")
 
     try:
         session["register_email"] = email
@@ -287,6 +287,20 @@ def register_provider_code_verify():
     )
 
     session_db.add(settings)
+    session_db.flush()
+
+    subscription = ProviderSubscription(
+        provider_id=new_provider.id,
+    )
+
+    session_db.add(subscription)
+    session_db.flush()
+
+    staff = ProviderStaff(
+        provider_id=new_provider.id,
+    )
+
+    session_db.add(staff)
     session_db.commit()
 
     session_db.close()
@@ -382,8 +396,8 @@ async def password_reset_verify():
 
     SMTP_SERVER = "smtp.gmail.com"
     SMTP_PORT = 587
-    YOUR_EMAIL = "shmidtalex0109@gmail.com"
-    YOUR_APP_PASSWORD = "zrinpxisbhrxsehe"
+    YOUR_EMAIL = os.getenv("SMTP_EMAIL")
+    YOUR_APP_PASSWORD = os.getenv("SMTP_PASSWORD")
 
     text_fallback = f'''
 Hallo,
@@ -1638,7 +1652,16 @@ def logout():
 @app.route("/dashboard/settings", methods=["GET"])
 @login_required
 def settings():
-    return render_template("settings.html", room_id=session.get("room_id"))
+    session_db = Session()
+
+    subscription = session_db.query(ProviderSubscription).filter_by(
+        provider_id=current_user.id
+    ).first()
+
+    return render_template("settings.html",
+           room_id=session.get("room_id"),
+           subscription_plan=subscription.plan
+    )
 
 @app.route("/dashboard/settings/delete_account", methods=["POST"])
 @login_required
@@ -1705,7 +1728,7 @@ def get_provider_profile():
             "saturday_close": settings.saturday_close,
             "sunday_closed": settings.sunday_closed,
             "queue_enabled": settings.queue_enabled,
-            "queue_max_length": settings.queue_max_length
+            "queue_max_length": settings.queue_max_length,
         }
 
 
@@ -1788,8 +1811,8 @@ def change_password_code():
     try:
         SMTP_SERVER = "smtp.gmail.com"
         SMTP_PORT = 587
-        YOUR_EMAIL = "shmidtalex0109@gmail.com"
-        YOUR_APP_PASSWORD = "zrinpxisbhrxsehe"
+        YOUR_EMAIL = os.getenv("SMTP_EMAIL")
+        YOUR_APP_PASSWORD = os.getenv("SMTP_PASSWORD")
 
         session["change_password_email"] = current_user.email
         session["change_password_code"] = "".join(random.choices("0123456789", k=4))
@@ -1982,8 +2005,8 @@ async def update_email_send_code():
 
     SMTP_SERVER = "smtp.gmail.com"
     SMTP_PORT = 587
-    YOUR_EMAIL = "shmidtalex0109@gmail.com"
-    YOUR_APP_PASSWORD = "zrinpxisbhrxsehe"
+    YOUR_EMAIL = os.getenv("SMTP_EMAIL")
+    YOUR_APP_PASSWORD = os.getenv("SMTP_PASSWORD")
 
     session_db = Session()
     try:
@@ -2244,8 +2267,8 @@ def reminder_worker():
         time.sleep(60)
 
 def send_reminder_email(appointment, timing):
-    YOUR_EMAIL = "shmidtalex0109@gmail.com"
-    YOUR_APP_PASSWORD = "zrinpxisbhrxsehe"
+    YOUR_EMAIL = os.getenv("SMTP_EMAIL")
+    YOUR_APP_PASSWORD = os.getenv("SMTP_PASSWORD")
 
     if timing == "24h":
         subject = "Erinnerung: Dein Termin morgen – Flowline"
@@ -2439,6 +2462,11 @@ def save_queue_settings():
 
     finally:
         session_db.close()
+
+@app.route("/dashboard/upgrade")
+@login_required
+def upgrade():
+    return render_template("upgrade.html")
 
 reminder_thread = threading.Thread(target=reminder_worker, daemon=True)
 reminder_thread.start()

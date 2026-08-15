@@ -22,6 +22,8 @@ class Provider(Base):
     appointments = relationship("Appointment", back_populates="provider")
     queue_entries = relationship("QueueEntry", back_populates="provider")
     settings = relationship("ProviderSettings", back_populates="provider")
+    subscription = relationship("ProviderSubscription", back_populates="provider", uselist=False) # uselist=False Danila fragen
+    staff = relationship("Staff", back_populates="provider")
 
 class ProviderCredentials(Base):
     __tablename__ = "provider_credentials"
@@ -46,6 +48,17 @@ class ProviderService(Base):
     appointments = relationship("Appointment", back_populates="service")
     queue_entries = relationship("QueueEntry", back_populates="service")
 
+class ProviderStaff(Base):
+    __tablename__ = "staff"
+
+    id = Column(Integer, primary_key=True)
+    provider_id = Column(Integer, ForeignKey("providers.id"), nullable=False)
+    name = Column(String(200), nullable=False)
+    is_owner = Column(Boolean, default=False)
+
+    provider = relationship("Provider", back_populates="staff")
+    appointments = relationship("Appointment", back_populates="staff_member")
+    queue_entries = relationship("QueueEntry", back_populates="staff_member")
 
 class Appointment(Base):
     __tablename__ = "appointments"
@@ -53,6 +66,7 @@ class Appointment(Base):
     id = Column(Integer, primary_key=True)
     provider_id = Column(Integer, ForeignKey("providers.id"), nullable=False)
     service_id = Column(Integer, ForeignKey("provider_services.id"), nullable=True)
+    staff_id = Column(Integer, ForeignKey("staff.id"), nullable=True)
     customer_name = Column(String(200))
     customer_phone = Column(String(50))
     customer_email = Column(String(255))
@@ -66,6 +80,7 @@ class Appointment(Base):
 
     provider = relationship("Provider",        back_populates="appointments")
     service = relationship("ProviderService", back_populates="appointments")
+    staff_member = relationship("Staff", back_populates="appointments")
 
 class QueueEntry(Base):
     __tablename__ = "queue_entries"
@@ -73,6 +88,7 @@ class QueueEntry(Base):
     id = Column(Integer, primary_key=True)
     provider_id = Column(Integer, ForeignKey("providers.id"), nullable=False)
     service_id = Column(Integer, ForeignKey("provider_services.id"), nullable=True)
+    staff_id = Column(Integer, ForeignKey("staff.id"), nullable=True)
     customer_name = Column(String(200))
     customer_phone = Column(String(50))
     start = Column(DateTime(timezone=True))
@@ -85,6 +101,7 @@ class QueueEntry(Base):
 
     provider = relationship("Provider", back_populates="queue_entries")
     service = relationship("ProviderService", back_populates="queue_entries")
+    staff_member = relationship("Staff", back_populates="queue_entries")
 
 
 class ProviderSettings(Base):
@@ -107,7 +124,27 @@ class ProviderSettings(Base):
     queue_enabled = Column(Boolean, default=True)
     queue_max_length = Column(Integer, default=20)
 
+    sms_credits_used  = Column(Integer, default=0)
+    sms_credits_reset = Column(DateTime, default=datetime.utcnow)
+
     provider = relationship("Provider", back_populates="settings")
+
+
+class ProviderSubscription(Base):
+    __tablename__ = "provider_subscriptions"
+
+    id = Column(Integer, primary_key=True)
+    provider_id = Column(Integer, ForeignKey("providers.id"), nullable=False)
+
+    plan = Column(String(50), nullable=False, default="free")  # free, basic, pro, premium
+    start_date = Column(DateTime, nullable=True, default=datetime.utcnow)
+    end_date = Column(DateTime, nullable=True)
+
+    is_active = Column(Boolean, default=True)
+    auto_renew = Column(Boolean, default=True)
+
+    provider = relationship("Provider", back_populates="subscription")
+
 
 
 Base.metadata.create_all(engine)
