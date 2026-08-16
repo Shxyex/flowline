@@ -736,7 +736,7 @@
         <div class="form-row">
           <div class="form-row-label">Max. Warteschlange</div>
           <div class="form-row-value">
-            <input id="queue_max_length" type="number" value="20" style="width:100px;" min="1" max="100">
+            <input id="queue_max_length" type="number" value="20" style="width:100px;" min="1">
             <div class="hint">Ab dieser Anzahl können sich keine neuen Kunden mehr eintragen.</div>
           </div>
         </div>
@@ -784,8 +784,8 @@
             <div class="form-row-value">
               <select id="sms-timing">
                 <option value="done">Wenn der Vorherige fertig ist</option>
+                <option value="5">5 Minuten vorher</option>
                 <option value="10">10 Minuten vorher</option>
-                <option value="20">20 Minuten vorher</option>
               </select>
             </div>
           </div>

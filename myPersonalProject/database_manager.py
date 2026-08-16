@@ -13,6 +13,7 @@ class Provider(Base):
 
     id = Column(Integer, primary_key=True)
     business_name = Column(String(200), nullable=False)
+    owner_name = Column(String(200), nullable=False)
     category = Column(String(100), nullable=False)
     address = Column(String(300))
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -23,7 +24,7 @@ class Provider(Base):
     queue_entries = relationship("QueueEntry", back_populates="provider")
     settings = relationship("ProviderSettings", back_populates="provider")
     subscription = relationship("ProviderSubscription", back_populates="provider", uselist=False) # uselist=False Danila fragen
-    staff = relationship("Staff", back_populates="provider")
+    staff = relationship("ProviderStaff", back_populates="provider")
 
 class ProviderCredentials(Base):
     __tablename__ = "provider_credentials"
@@ -80,7 +81,7 @@ class Appointment(Base):
 
     provider = relationship("Provider",        back_populates="appointments")
     service = relationship("ProviderService", back_populates="appointments")
-    staff_member = relationship("Staff", back_populates="appointments")
+    staff_member = relationship("ProviderStaff", back_populates="appointments")
 
 class QueueEntry(Base):
     __tablename__ = "queue_entries"
@@ -98,10 +99,11 @@ class QueueEntry(Base):
     original_position = Column(Integer, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     status = Column(String(50), default="pending")
+    sms_sent = Column(Boolean, default=False)
 
     provider = relationship("Provider", back_populates="queue_entries")
     service = relationship("ProviderService", back_populates="queue_entries")
-    staff_member = relationship("Staff", back_populates="queue_entries")
+    staff_member = relationship("ProviderStaff", back_populates="queue_entries")
 
 
 class ProviderSettings(Base):
@@ -123,6 +125,9 @@ class ProviderSettings(Base):
 
     queue_enabled = Column(Boolean, default=True)
     queue_max_length = Column(Integer, default=20)
+
+    sms_enabled = Column(Boolean, default=False)
+    sms_timing = Column(String, default="done") # Sobald der Letzte fertig ist.
 
     sms_credits_used  = Column(Integer, default=0)
     sms_credits_reset = Column(DateTime, default=datetime.utcnow)

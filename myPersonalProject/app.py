@@ -14,6 +14,7 @@ from dotenv import load_dotenv
 import os
 import threading
 import time
+from twilio.rest import Client
 
 from database_manager import Session, Provider, ProviderCredentials, ProviderService, ProviderSettings, Appointment, QueueEntry, ProviderSubscription, ProviderStaff, User
 
@@ -25,6 +26,9 @@ socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
 bcrypt = Bcrypt(app)
 login_manager = LoginManager(app)
 login_manager.login_view = "provider_login_page"
+TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID")
+TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
+TWILIO_PHONE_NUMBER = os.getenv("TWILIO_PHONE_NUMBER")
 
 @login_manager.user_loader
 def user_loader(user_id):
@@ -99,6 +103,7 @@ def provider_register():
 @app.route("/register/provider/submit", methods=["POST", "GET"])
 def provider_register_submit():
     email = request.form.get("email")
+    owner_name = request.form.get("owner_name")
     business_name = request.form.get("business_name")
     category = request.form.get("category")
     address = request.form.get("address")
@@ -107,6 +112,7 @@ def provider_register_submit():
 
     session["registration_data"] = {
         "email": email,
+        "owner_name": owner_name,
         "business_name": business_name,
         "category": category,
         "address": address,
@@ -265,6 +271,7 @@ def register_provider_code_verify():
     session_db = Session()
 
     new_provider = Provider(
+        owner_name=data["owner_name"],
         business_name=data["business_name"],
         category=data["category"],
         address=data["address"]
@@ -298,6 +305,8 @@ def register_provider_code_verify():
 
     staff = ProviderStaff(
         provider_id=new_provider.id,
+        name=data["owner_name"],
+        is_owner=True,
     )
 
     session_db.add(staff)
@@ -1660,7 +1669,7 @@ def settings():
 
     return render_template("settings.html",
            room_id=session.get("room_id"),
-           subscription_plan=subscription.plan
+           subscription_plan=subscription.plan if subscription.plan not in ["free", "basic"] else "pro"
     )
 
 @app.route("/dashboard/settings/delete_account", methods=["POST"])
@@ -2258,6 +2267,44 @@ def reminder_worker():
                         send_reminder_email(a, "3h")
                         a.reminded_3h = True
 
+            queue_entries = session_db.query(QueueEntry).filter(
+                QueueEntry.customer_phone != None,
+                QueueEntry.customer_phone != "",
+                QueueEntry.status == "assigned",
+                QueueEntry.sms_sent == False
+            ).options(
+                joinedload(QueueEntry.provider)
+            ).all()
+
+            for q in queue_entries:
+                if not q.start:
+                    continue
+
+                q_settings = session_db.query(ProviderSettings).filter_by(
+                    provider_id=q.provider_id
+                ).first()
+
+                if not q_settings or not q_settings.sms_enabled:
+                    continue
+
+                if q_settings.sms_timing == "done":
+                    continue  # wird in update_status gehandelt
+
+                minutes_before = int(q_settings.sms_timing)  # 5 oder 10
+                target_time = now + datetime.timedelta(minutes=minutes_before)
+
+                q_start = q.start.replace(tzinfo=datetime.timezone.utc).astimezone()
+                diff = abs((q_start - target_time).total_seconds())
+
+                if diff < 60:
+                    send_sms(
+                        q.provider_id,
+                        q.customer_phone,
+                        f"Du bist in {minutes_before} Minuten dran bei {q.provider.business_name}! Bitte sei bereit. 💈"
+                    )
+                    q.sms_sent = True
+                    session_db.commit()
+
         except Exception as e:
             print("REMINDER ERROR:", e)
 
@@ -2459,6 +2506,97 @@ def save_queue_settings():
             "error": "Etwas ist schiefgelaufen. Deine Änderungen wurden nicht gespeichert."
         })
         return jsonify({"error": str(e)}), 500
+
+    finally:
+        session_db.close()
+
+@app.route("/dashboard/settings/sms/save", methods=["POST"])
+@login_required
+def save_sms_settings():
+    data = request.get_json()
+    sms_enabled = data["sms_enabled"]
+    sms_timing = data["sms_timing"]
+
+    session_db = Session()
+
+    try:
+        settings = session_db.query(ProviderSettings).filter_by(
+            provider_id=current_user.id
+        ).first()
+
+        if not settings:
+            settings = ProviderSettings(provider_id=current_user.id)
+            session_db.add(settings)
+
+        settings.sms_enabled = sms_enabled
+        settings.sms_timing = sms_timing
+
+        session_db.commit()
+        session_db.close()
+
+        emit_to_user("message", {
+            "message": "Einstellungen erfolgreich gespeichert."
+        })
+        return jsonify({"message": "Einstellungen erfolgreich gespeichert."}), 200
+
+
+    except Exception as e:
+        print(e)
+        emit_to_user("error", {
+            "error": "Etwas ist schiefgelaufen. Deine Änderungen wurden nicht gespeichert."
+        })
+        return jsonify({"error": str(e)}), 500
+
+    finally:
+        session_db.close()
+
+def send_sms(provider_id, phone, message):
+    session_db = Session()
+
+    try:
+        settings = session_db.query(ProviderSettings).filter_by(
+            provider_id=provider_id
+        ).first()
+
+        subscription = session_db.query(ProviderSubscription).filter_by(
+            provider_id=provider_id,
+            is_active=True
+        ).first()
+
+        if not settings or not settings.sms_enabled:
+            return False
+
+        plan = subscription.plan if subscription else "free"
+
+        if plan in ("free", "basic"):
+            return False
+
+        SMS_LIMITS = {"pro": 200, "premium": 500}
+        limit = SMS_LIMITS.get(plan, 0)
+
+        now = datetime.datetime.utcnow()
+        if (now - settings.sms_credits_reset).days >= 30:
+            settings.sms_credits_used = 0
+            settings.sms_credits_reset = now
+
+        if settings.sms_credits_used >= limit:
+            print(f"SMS limit erreicht für provider {provider_id}")
+            return False
+
+        client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
+        client.messages.create(
+            body=message,
+            from_=TWILIO_PHONE_NUMBER,
+            to=phone
+        )
+
+        settings.sms_credits_used += 1
+        session_db.commit()  # ← wichtig
+        return True
+
+    except Exception as e:
+        print("SMS ERROR:", e)
+        return False
 
     finally:
         session_db.close()
