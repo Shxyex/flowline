@@ -23,7 +23,7 @@ class Provider(Base):
     appointments = relationship("Appointment", back_populates="provider")
     queue_entries = relationship("QueueEntry", back_populates="provider")
     settings = relationship("ProviderSettings", back_populates="provider")
-    subscription = relationship("ProviderSubscription", back_populates="provider", uselist=False) # uselist=False Danila fragen
+    subscription = relationship("ProviderSubscription", back_populates="provider")
     staff = relationship("ProviderStaff", back_populates="provider")
 
 class ProviderCredentials(Base):
@@ -131,6 +131,8 @@ class ProviderSettings(Base):
 
     sms_credits_used  = Column(Integer, default=0)
     sms_credits_reset = Column(DateTime, default=datetime.utcnow)
+
+    queue_token = Column(String(64), unique=True, nullable=True)
 
     provider = relationship("Provider", back_populates="settings")
 

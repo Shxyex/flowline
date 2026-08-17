@@ -1,6 +1,6 @@
 import smtplib
 from email.message import EmailMessage
-from flask import Flask, render_template, redirect, url_for, request, session, g, jsonify
+from flask import Flask, render_template, redirect, url_for, request, session, send_file, jsonify
 from flask_bcrypt import Bcrypt
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user, UserMixin
 from flask_socketio import SocketIO, emit, join_room
@@ -15,6 +15,9 @@ import os
 import threading
 import time
 from twilio.rest import Client
+import qrcode
+from io import BytesIO
+import secrets
 
 from database_manager import Session, Provider, ProviderCredentials, ProviderService, ProviderSettings, Appointment, QueueEntry, ProviderSubscription, ProviderStaff, User
 
@@ -291,6 +294,7 @@ def register_provider_code_verify():
 
     settings = ProviderSettings(
         provider_id=new_provider.id,
+        queue_token=secrets.token_urlsafe(16)
     )
 
     session_db.add(settings)
@@ -1141,6 +1145,29 @@ def update_status(type, id):
         # 2. Status aktualisieren
         entry.status = status
 
+        if type == "walkin" and status == "completed":
+            settings = session_db.query(ProviderSettings).filter_by(
+                provider_id=current_user.id
+            ).first()
+
+            if settings and settings.sms_enabled and settings.sms_timing == "done":
+                next_entry = session_db.query(QueueEntry).filter_by(
+                    provider_id=current_user.id,
+                    status="pending"
+                ).order_by(QueueEntry.position.asc()).first()
+
+                provider = session_db.query(Provider).filter_by(
+                    id=current_user.id
+                ).first()
+
+                if next_entry and next_entry.customer_phone:
+                    send_sms(
+                        current_user.id,
+                        next_entry.customer_phone,
+                        f"Du bist als Nächstes dran bei {provider.business_name}. Bitte komm rein. 💈"
+                    )
+                    next_entry.sms_sent = True
+
         # 3. Wenn ein Termin/Walk‑in auf "in_progress" gesetzt wird:
         #    → alle anderen aktiven Einträge zurücksetzen
         if status == "in_progress":
@@ -1667,9 +1694,18 @@ def settings():
         provider_id=current_user.id
     ).first()
 
+    settings = session_db.query(ProviderSettings).filter_by(
+        provider_id=current_user.id
+    ).first()
+
+    token = settings.queue_token
+
+    url = f"http://127.0.0.1:6060/queue/{token}"
+
     return render_template("settings.html",
            room_id=session.get("room_id"),
-           subscription_plan=subscription.plan if subscription.plan not in ["free", "basic"] else "pro"
+           subscription_plan=subscription.plan,
+           qrcode_url=url
     )
 
 @app.route("/dashboard/settings/delete_account", methods=["POST"])
@@ -2259,6 +2295,7 @@ def reminder_worker():
                     if diff_24 < 60 and not a.reminded_24h:
                         send_reminder_email(a, "24h")
                         a.reminded_24h = True
+                        session_db.commit()
 
                 # 3h Erinnerung – Fenster von 1 Minute
                 if settings.reminder_3h:
@@ -2266,6 +2303,7 @@ def reminder_worker():
                     if diff_3 < 60 and not a.reminded_3h:
                         send_reminder_email(a, "3h")
                         a.reminded_3h = True
+                        session_db.commit()
 
             queue_entries = session_db.query(QueueEntry).filter(
                 QueueEntry.customer_phone != None,
@@ -2293,7 +2331,7 @@ def reminder_worker():
                 minutes_before = int(q_settings.sms_timing)  # 5 oder 10
                 target_time = now + datetime.timedelta(minutes=minutes_before)
 
-                q_start = q.start.replace(tzinfo=datetime.timezone.utc).astimezone()
+                q_start = q.start.astimezone()
                 diff = abs((q_start - target_time).total_seconds())
 
                 if diff < 60:
@@ -2324,7 +2362,7 @@ def send_reminder_email(appointment, timing):
         subject = "Erinnerung: Dein Termin in 3 Stunden – Flowline"
         zeit_text = "in 3 Stunden"
 
-    start_local = appointment.start.replace(tzinfo=datetime.timezone.utc).astimezone()
+    start_local = appointment.start.astimezone()
     uhrzeit = start_local.strftime("%H:%M")
     datum = start_local.strftime("%d.%m.%Y")
 
@@ -2600,6 +2638,43 @@ def send_sms(provider_id, phone, message):
 
     finally:
         session_db.close()
+
+@app.route("/dashboard/settings/qr/image")
+@login_required
+def qr_image():
+    session_db = Session()
+    try:
+        settings = session_db.query(ProviderSettings).filter_by(
+            provider_id=current_user.id
+        ).first()
+
+        token = settings.queue_token
+
+        url = f"http://127.0.0.1:6060/queue/{token}"
+
+        qr = qrcode.QRCode(
+            version=1,
+            error_correction=qrcode.constants.ERROR_CORRECT_H,
+            box_size=10,
+            border=4
+        )
+
+        qr.add_data(url)
+        qr.make(fit=True)
+
+        img = qr.make_image(fill_color="black", back_color="white")
+
+        buffer = BytesIO()
+        img.save(buffer, format="PNG")
+        buffer.seek(0)
+
+        return send_file(buffer, mimetype="image/png")
+
+
+    except Exception as e:
+        print(e)
+        return jsonify({"error": str(e)}), 500
+
 
 @app.route("/dashboard/upgrade")
 @login_required

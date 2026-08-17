@@ -699,7 +699,7 @@
             <p>Kunden öffnen diese Seite, geben ihren Namen und Service an und landen automatisch in deiner Warteschlange – ohne App, ohne Account.</p>
 
             <div class="qr-url-box">
-              <span id="qr-url">https://barberos.app/queue/abc123xyz</span>
+              <span id="qr-url">{{ qrcode_url }}</span>
               <button onclick="copyUrl()"><i class="fa-regular fa-copy"></i> Kopieren</button>
             </div>
 
@@ -969,23 +969,41 @@
   }
 
   function downloadQR() {
+      const img = document.querySelector("#qr-container img");
+
       const a = document.createElement("a");
-      a.href = "/dashboard/settings/qr/download";
+      a.href = img.src;
       a.download = "flowline-qrcode.png";
       a.click();
   }
 
-  function printQR() {
+  async function printQR() {
     const img = document.querySelector("#qr-container img");
-    const win = window.open("", "_blank");
-    win.document.write(`
-        <html><body style="display:flex;justify-content:center;align-items:center;height:100vh;margin:0;">
-            <img src="${img.src}" style="width:300px;height:300px;">
-        </body></html>
-    `);
-    win.document.close();
-    win.print();
-    win.close();
+
+    const response = await fetch(img.src);
+    const blob = await response.blob();
+
+    const reader = new FileReader();
+
+    reader.onloadend = function () {
+        const base64 = reader.result; // data:image/png;base64,...
+        console.log(base64);
+        const win = window.open("", "_blank");
+
+        win.document.write(`
+            <html>
+            <body style="display:flex;justify-content:center;align-items:center;height:100vh;margin:0;">
+                <img src="${base64}" style="width:300px;height:300px;">
+            </body>
+            </html>
+        `);
+
+        win.document.close();
+        win.print();
+        win.close();
+    };
+
+    reader.readAsDataURL(blob);
   }
 
   function openDelAccountModal() {
