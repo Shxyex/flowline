@@ -99,7 +99,6 @@ class QueueEntry(Base):
     original_position = Column(Integer, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     status = Column(String(50), default="pending")
-    sms_sent = Column(Boolean, default=False)
 
     provider = relationship("Provider", back_populates="queue_entries")
     service = relationship("ProviderService", back_populates="queue_entries")
@@ -127,7 +126,6 @@ class ProviderSettings(Base):
     queue_max_length = Column(Integer, default=20)
 
     sms_enabled = Column(Boolean, default=False)
-    sms_timing = Column(String, default="done") # Sobald der Letzte fertig ist.
 
     sms_credits_used  = Column(Integer, default=0)
     sms_credits_reset = Column(DateTime, default=datetime.utcnow)

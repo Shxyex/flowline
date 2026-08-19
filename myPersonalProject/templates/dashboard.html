@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Dashboard</title>
+  <title>Dashboard – Flowline</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
   <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.css" rel="stylesheet">
@@ -750,7 +750,7 @@
       initialView: "timeGridWeek",
       selectable: true,
       editable: true,
-      eventOverlap: false,
+      eventOverlap: true,
       nowIndicator: true,
       allDaySlot: false,
       slotMinTime: data.weekday_open + ":00",
@@ -834,11 +834,16 @@
       },
 
       async eventDrop(info) {
+        state.calendar.setOption("eventOverlap", false);
+
         const res = await fetch(`/dashboard/appointments/${info.event.id}/${info.event.extendedProps.type}/move`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ start: info.event.startStr.slice(0, 16) })
         });
+
+
+        state.calendar.setOption("eventOverlap", true);
 
         if (!res.ok) {
           info.revert();
@@ -851,13 +856,19 @@
       },
 
       async eventResize(info) {
-        const res = await fetch(`/dashboard/appointments/${info.event.id}/resize`, {
+        /* if (info.event.extendedProps.type === "Walk-in") {
+          info.revert();
+          return;
+        } */
+
+        const res = await fetch(`/dashboard/appointments/${info.event.id}/${info.event.extendedProps.type}/resize`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ start: info.event.startStr, end: info.event.endStr })
         });
 
         if (!res.ok) {
+
           const data = await res.json().catch(() => null);
           console.log(data?.error);
           return;

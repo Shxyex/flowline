@@ -779,16 +779,6 @@
               </div>
             </div>
           </div>
-          <div class="form-row">
-            <div class="form-row-label">Benachrichtigung senden</div>
-            <div class="form-row-value">
-              <select id="sms-timing">
-                <option value="done">Wenn der Vorherige fertig ist</option>
-                <option value="5">5 Minuten vorher</option>
-                <option value="10">10 Minuten vorher</option>
-              </select>
-            </div>
-          </div>
           <div class="section-footer">
             <button class="btn-save" onclick="saveSmsSettings(); return false;">Speichern</button>
           </div>
@@ -1182,7 +1172,6 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
             sms_enabled: document.getElementById("sms-enabled").checked,
-            sms_timing: document.getElementById("sms-timing").value
         })
     });
 

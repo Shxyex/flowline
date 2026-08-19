@@ -763,7 +763,7 @@ def has_conflict(provider_id, start, end, exclude_appointment_id=None):
         if exclude_appointment_id and a.id == exclude_appointment_id:
             continue
 
-        if start < a.end and end > a.start:
+        if start < a.end.astimezone() and end > a.start.astimezone():
             return True
 
     # 2. Walk‑ins prüfen (nur assigned)
@@ -779,7 +779,7 @@ def has_conflict(provider_id, start, end, exclude_appointment_id=None):
         if not q.start:
             continue
 
-        if start < q.end and end > q.start:
+        if start < q.end.astimezone() and end > q.start.astimezone():
             return True
 
     return False
@@ -792,7 +792,7 @@ def move_appointment(appointment_id, type):
     new_start = datetime.datetime.fromisoformat(data.get("start")).astimezone()
     now = datetime.datetime.now(datetime.timezone.utc).astimezone().replace(second=0, microsecond=0)
 
-    if type == "walkin":
+    if type == "Walk-in":
         emit_to_user("error", {
             "error": "Walk‑ins ordnen sich automatisch ein und können nicht verschoben werden."
         })
@@ -845,45 +845,66 @@ def move_appointment(appointment_id, type):
     finally:
         session_db.close()
 
-@app.route("/dashboard/appointments/<int:appointment_id>/resize", methods=["PATCH"])
+@app.route("/dashboard/appointments/<int:appointment_id>/<string:type>/resize", methods=["PATCH"])
 @login_required
-def resize_appointment(appointment_id):
+def resize_appointment(appointment_id, type):
     data = request.get_json()
     start = datetime.datetime.fromisoformat(data.get("start")).astimezone()
     end = datetime.datetime.fromisoformat(data.get("end")).astimezone()
     diff = int((end - start).total_seconds() / 60)
-    now = datetime.datetime.now(datetime.timezone.utc).astimezone().replace(second=0, microsecond=0)
+    #now = datetime.datetime.now(datetime.timezone.utc).astimezone().replace(second=0, microsecond=0)
 
     session_db = Session()
     try:
+        if type == "Termin":
+            appointment = session_db.query(Appointment).filter_by(
+                id=appointment_id,
+                provider_id=current_user.id
+            ).first()
 
-        appointment = session_db.query(Appointment).filter_by(
-            id=appointment_id,
-            provider_id=current_user.id
-        ).first()
+            if not appointment:
+                emit_to_user("error", {"error": "Der Termin wurde nicht gefunden."})
+                return jsonify({"error": "Termin nicht gefunden."}), 404
 
-        if not appointment:
-            emit_to_user("error", {"error": "Der Termin wurde nicht gefunden."})
-            return jsonify({"error": "Termin nicht gefunden."}), 404
+            #if appointment.start.astimezone() <= now:
+                #emit_to_user("error", {"error": "Vergangene oder laufende Termine können nicht verändert werden."})
+                #return jsonify({"error": "Termin liegt in der Vergangenheit."}), 400
 
-        if appointment.start.astimezone() <= now:
-            emit_to_user("error", {"error": "Vergangene oder laufende Termine können nicht verändert werden."})
-            return jsonify({"error": "Termin liegt in der Vergangenheit."}), 400
+            #if end < now:
+                #emit_to_user("error", {"error": "Der Termin kann nicht in die Vergangenheit verschoben werden."})
+                #return jsonify({"error": "Ungültige Zeitangabe."}), 400
 
-        if start < now:
-            emit_to_user("error", {"error": "Der Termin kann nicht in die Vergangenheit verschoben werden."})
-            return jsonify({"error": "Ungültige Zeitangabe."}), 400
+            appointment.start = start
+            appointment.end = end
+            appointment.duration_minutes = diff
 
-        appointment.start = start
-        appointment.end = end
-        appointment.duration_minutes = diff
+            session_db.commit()
 
-        session_db.commit()
+            emit_to_user("message", {
+                "message": "Termin erfolgreich aktualisiert."
+            })
+            return jsonify({"message": "Termin aktualisiert."}), 200
 
-        emit_to_user("message", {
-            "message": "Termin erfolgreich aktualisiert."
-        })
-        return jsonify({"message": "Termin aktualisiert."}), 200
+        else:
+            queue = session_db.query(QueueEntry).filter_by(
+                id=appointment_id,
+                provider_id=current_user.id
+            ).first()
+
+            if not queue:
+                emit_to_user("error", {"error": "Der Walk-in wurde nicht gefunden."})
+                return jsonify({"error": "Walk-in nicht gefunden."}), 404
+
+            queue.start = start
+            queue.end = end
+            queue.duration_minutes = diff
+
+            session_db.commit()
+
+            emit_to_user("message", {
+                "message": "Walk-in erfolgreich aktualisiert."
+            })
+            return jsonify({"message": "Walk-in aktualisiert."}), 200
 
     except Exception as e:
         print(e)
@@ -1014,7 +1035,7 @@ def next_appointment():
             "start": a.start.astimezone(),
             "end": a.end.astimezone(),
             "extendedProps": {
-                "type": "termin",
+                "type": "Termin",
                 "duration": a.duration_minutes,
                 "service": service.name if service else None,
                 "status": a.status
@@ -1080,7 +1101,7 @@ def current_appointment():
         service = session_db.query(ProviderService).filter_by(id=appointment.service_id).first()
 
         return jsonify({
-            "type": "termin",
+            "type": "Termin",
             "data": {
                 "id": appointment.id,
                 "title": appointment.customer_name,
@@ -1098,7 +1119,7 @@ def current_appointment():
         service = session_db.query(ProviderService).filter_by(id=walkin.service_id).first()
 
         return jsonify({
-            "type": "walkin",
+            "type": "Walk-in",
             "data": {
                 "id": walkin.id,
                 "title": walkin.customer_name,
@@ -1150,7 +1171,7 @@ def update_status(type, id):
                 provider_id=current_user.id
             ).first()
 
-            if settings and settings.sms_enabled and settings.sms_timing == "done":
+            if settings and settings.sms_enabled:
                 next_entry = session_db.query(QueueEntry).filter_by(
                     provider_id=current_user.id,
                     status="pending"
@@ -1166,7 +1187,6 @@ def update_status(type, id):
                         next_entry.customer_phone,
                         f"Du bist als Nächstes dran bei {provider.business_name}. Bitte komm rein. 💈"
                     )
-                    next_entry.sms_sent = True
 
         # 3. Wenn ein Termin/Walk‑in auf "in_progress" gesetzt wird:
         #    → alle anderen aktiven Einträge zurücksetzen
@@ -1533,7 +1553,6 @@ def find_free_slot(start_time, duration, appointments, timeline):
 
         # Termine prüfen
         for a in appointments:
-            print(candidate_end, a["start"], a["end"], a["status"], "gggggggg")
             if not (candidate_end <= a["start"] or a["end"] <= candidate):
                 conflict = True
                 candidate = a["end"]
@@ -1638,7 +1657,7 @@ def get_timeline():
                     "end": item["end"].isoformat(),
                     "color": "#1e88e5",
                     "extendedProps": {
-                        "type": "walkin",
+                        "type": "Walk-in",
                         "service": service.name,
                         "duration": item["duration"],
                         "status": item["status"],
@@ -1658,7 +1677,7 @@ def get_timeline():
                     "end": item["end"].isoformat(),
                     "color": "#43a047",
                     "extendedProps": {
-                        "type": "termin",
+                        "type": "Termin",
                         "service": service.name,
                         "service_id": service.id,
                         "duration": item["duration"],
@@ -2302,46 +2321,15 @@ def reminder_worker():
                     diff_3 = abs((start - in_3h).total_seconds())
                     if diff_3 < 60 and not a.reminded_3h:
                         send_reminder_email(a, "3h")
+                        if settings.sms_enabled and a.customer_phone:
+                            message = f"Dein Termin bei {a.provider.business_name} ist in 3 Stunden ({start.strftime('%H:%M')} Uhr). Bis gleich!"
+                            send_sms(
+                                a.provider_id,
+                                a.customer_phone,
+                                message
+                            )
                         a.reminded_3h = True
                         session_db.commit()
-
-            queue_entries = session_db.query(QueueEntry).filter(
-                QueueEntry.customer_phone != None,
-                QueueEntry.customer_phone != "",
-                QueueEntry.status == "assigned",
-                QueueEntry.sms_sent == False
-            ).options(
-                joinedload(QueueEntry.provider)
-            ).all()
-
-            for q in queue_entries:
-                if not q.start:
-                    continue
-
-                q_settings = session_db.query(ProviderSettings).filter_by(
-                    provider_id=q.provider_id
-                ).first()
-
-                if not q_settings or not q_settings.sms_enabled:
-                    continue
-
-                if q_settings.sms_timing == "done":
-                    continue  # wird in update_status gehandelt
-
-                minutes_before = int(q_settings.sms_timing)  # 5 oder 10
-                target_time = now + datetime.timedelta(minutes=minutes_before)
-
-                q_start = q.start.astimezone()
-                diff = abs((q_start - target_time).total_seconds())
-
-                if diff < 60:
-                    send_sms(
-                        q.provider_id,
-                        q.customer_phone,
-                        f"Du bist in {minutes_before} Minuten dran bei {q.provider.business_name}! Bitte sei bereit. 💈"
-                    )
-                    q.sms_sent = True
-                    session_db.commit()
 
         except Exception as e:
             print("REMINDER ERROR:", e)
@@ -2553,7 +2541,6 @@ def save_queue_settings():
 def save_sms_settings():
     data = request.get_json()
     sms_enabled = data["sms_enabled"]
-    sms_timing = data["sms_timing"]
 
     session_db = Session()
 
@@ -2567,7 +2554,6 @@ def save_sms_settings():
             session_db.add(settings)
 
         settings.sms_enabled = sms_enabled
-        settings.sms_timing = sms_timing
 
         session_db.commit()
         session_db.close()
@@ -2676,6 +2662,47 @@ def qr_image():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/queue/<token>")
+def customer_queue_join(token):
+
+    session_db = Session()
+    try:
+        settings = session_db.query(ProviderSettings).filter_by(
+            queue_token=token
+        ).first()
+
+        if not settings:
+            return render_template("queue_invalid.html"), 404
+
+        if not settings.queue_enabled:
+            return render_template("queue_closed.html")
+
+        provider = session_db.query(Provider).filter_by(
+            id=settings.provider_id
+        ).first()
+
+        service = session_db.query(ProviderService).filter_by(
+            provider_id=settings.provider_id
+        ).all()
+
+        active_count = session_db.query(QueueEntry).filter_by(
+            provider_id=settings.provider_id
+        ).filter(
+            QueueEntry.status.notin_(["completed", "no_show"])
+        ).count()
+
+        is_full = active_count >= settings.queue_max_length
+
+        return render_template("customer_queue_join.html",
+            provider=provider,
+            service=service,
+            token=token,
+            is_full=is_full
+       )
+
+    finally:
+        session_db.close()
+
 @app.route("/dashboard/upgrade")
 @login_required
 def upgrade():
@@ -2684,5 +2711,4 @@ def upgrade():
 reminder_thread = threading.Thread(target=reminder_worker, daemon=True)
 reminder_thread.start()
 
-if __name__ == "__main__":
-    socketio.run(app, use_reloader=True, debug=True, allow_unsafe_werkzeug=True, port=6060)
+socketio.run(app, use_reloader=True, debug=True, allow_unsafe_werkzeug=True, port=6060)
