@@ -379,7 +379,7 @@ def password_reset_verify_code():
     return render_template("verify-code.html", submit_url="/password-reset/check-password", resend_url="/password-reset/verify", room_id=session.get("room_id"))
 
 @app.route("/password-reset/verify", methods=["POST"])
-async def password_reset_verify():
+def password_reset_verify():
     reset_id = str(uuid.uuid4())
     session["reset_id"] = reset_id
 
@@ -852,7 +852,6 @@ def resize_appointment(appointment_id, type):
     start = datetime.datetime.fromisoformat(data.get("start")).astimezone()
     end = datetime.datetime.fromisoformat(data.get("end")).astimezone()
     diff = int((end - start).total_seconds() / 60)
-    #now = datetime.datetime.now(datetime.timezone.utc).astimezone().replace(second=0, microsecond=0)
 
     session_db = Session()
     try:
@@ -865,14 +864,6 @@ def resize_appointment(appointment_id, type):
             if not appointment:
                 emit_to_user("error", {"error": "Der Termin wurde nicht gefunden."})
                 return jsonify({"error": "Termin nicht gefunden."}), 404
-
-            #if appointment.start.astimezone() <= now:
-                #emit_to_user("error", {"error": "Vergangene oder laufende Termine können nicht verändert werden."})
-                #return jsonify({"error": "Termin liegt in der Vergangenheit."}), 400
-
-            #if end < now:
-                #emit_to_user("error", {"error": "Der Termin kann nicht in die Vergangenheit verschoben werden."})
-                #return jsonify({"error": "Ungültige Zeitangabe."}), 400
 
             appointment.start = start
             appointment.end = end
@@ -968,6 +959,7 @@ def appointments_today():
     day_start = datetime.datetime.combine(today, datetime.time.min)
     day_end = datetime.datetime.combine(today, datetime.time.max)
 
+
     session_db = Session()
 
     appointments = session_db.query(Appointment).filter(
@@ -977,16 +969,6 @@ def appointments_today():
     ).all()
 
     session_db.close()
-
-    #cursor.execute("""
-        #SELECT *
-        #FROM appointments_table
-        #WHERE DATE(start) = ?
-          #AND provider_id = ?
-          #AND status != 'no_show'
-    #""", (today, current_user.id))
-
-    #rows = cursor.fetchall()
 
     # FullCalendar-Format
 
@@ -1005,7 +987,6 @@ def appointments_today():
                 "status": a.status
             }
         })
-
     return jsonify({
         "date": today,
         "appointments": appointments_fc
@@ -1182,11 +1163,16 @@ def update_status(type, id):
                 ).first()
 
                 if next_entry and next_entry.customer_phone:
-                    send_sms(
+                    result = send_sms(
                         current_user.id,
                         next_entry.customer_phone,
                         f"Du bist als Nächstes dran bei {provider.business_name}. Bitte komm rein. 💈"
                     )
+                    if result and result["success"]:
+                        settings.sms_credits_used += 1
+                        session_db.commit()
+
+
 
         # 3. Wenn ein Termin/Walk‑in auf "in_progress" gesetzt wird:
         #    → alle anderen aktiven Einträge zurücksetzen
@@ -1710,7 +1696,8 @@ def settings():
     session_db = Session()
 
     subscription = session_db.query(ProviderSubscription).filter_by(
-        provider_id=current_user.id
+        provider_id=current_user.id,
+        is_active=True
     ).first()
 
     settings = session_db.query(ProviderSettings).filter_by(
@@ -1721,10 +1708,17 @@ def settings():
 
     url = f"http://127.0.0.1:6060/queue/{token}"
 
+    plan = subscription.plan
+
+    SMS_LIMITS = {"pro": 80, "premium": 200}
+    limit = SMS_LIMITS.get(plan, 0)
+
     return render_template("settings.html",
            room_id=session.get("room_id"),
-           subscription_plan=subscription.plan,
-           qrcode_url=url
+           subscription_plan=plan,
+           qrcode_url=url,
+           sms_credits_used=settings.sms_credits_used,
+           sms_limit=limit
     )
 
 @app.route("/dashboard/settings/delete_account", methods=["POST"])
@@ -2323,11 +2317,16 @@ def reminder_worker():
                         send_reminder_email(a, "3h")
                         if settings.sms_enabled and a.customer_phone:
                             message = f"Dein Termin bei {a.provider.business_name} ist in 3 Stunden ({start.strftime('%H:%M')} Uhr). Bis gleich!"
-                            send_sms(
+                            result = send_sms(
                                 a.provider_id,
                                 a.customer_phone,
                                 message
                             )
+
+                            if result and result["success"]:
+                                settings.sms_credits_used += 1
+                                session_db.commit()
+
                         a.reminded_3h = True
                         session_db.commit()
 
@@ -2588,14 +2587,14 @@ def send_sms(provider_id, phone, message):
         ).first()
 
         if not settings or not settings.sms_enabled:
-            return False
+            return {"success": False, "reason": "sms_not_enabled"}
 
-        plan = subscription.plan if subscription else "free"
+        plan = subscription.plan
 
         if plan in ("free", "basic"):
-            return False
+            return {"success": False, "reason": "plan"}
 
-        SMS_LIMITS = {"pro": 200, "premium": 500}
+        SMS_LIMITS = {"pro": 80, "premium": 200}
         limit = SMS_LIMITS.get(plan, 0)
 
         now = datetime.datetime.utcnow()
@@ -2604,8 +2603,10 @@ def send_sms(provider_id, phone, message):
             settings.sms_credits_reset = now
 
         if settings.sms_credits_used >= limit:
-            print(f"SMS limit erreicht für provider {provider_id}")
-            return False
+            emit_to_user("error", {
+                "error": "Dein SMS-Kontingent für diesen Monat ist aufgebraucht. Upgrade deinen Plan für mehr SMS."
+            })
+            return {"success": False, "reason": "limit_reached"}
 
         client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
         client.messages.create(
@@ -2616,11 +2617,11 @@ def send_sms(provider_id, phone, message):
 
         settings.sms_credits_used += 1
         session_db.commit()  # ← wichtig
-        return True
+        return {"success": True}
 
     except Exception as e:
         print("SMS ERROR:", e)
-        return False
+        return {"success": False, "reason": "SMS ERROR"}
 
     finally:
         session_db.close()
@@ -2662,8 +2663,8 @@ def qr_image():
         return jsonify({"error": str(e)}), 500
 
 
-@app.route("/queue/<token>")
-def customer_queue_join(token):
+@app.route("/queue/<string:token>")
+def customer_queue(token):
 
     session_db = Session()
     try:
@@ -2703,10 +2704,77 @@ def customer_queue_join(token):
     finally:
         session_db.close()
 
+@app.route("/queue/<string:token>/join", methods=["POST"])
+def customer_join_queue(token):
+    session_db = Session()
+    try:
+        settings = session_db.query(ProviderSettings).filter_by(
+            queue_token=token
+        ).first()
+
+        if not settings or not settings.queue_enabled:
+            return jsonify({"error": "Warteschlange ist nicht verfügbar."}), 400
+
+        customer_name = request.form.get("customer_name", "").strip()
+        customer_phone = request.form.get("customer_phone", "").strip()
+        service_id = request.form.get("service_id")
+
+        if not customer_name or not service_id:
+            return jsonify({"error": "Bitte Name und Service angeben."}), 400
+
+        service = session_db.query(ProviderService).filter_by(
+            id=int(service_id),
+            provider_id=settings.provider_id
+        ).first()
+
+        if not service:
+            return jsonify({"error": "Service nicht gefunden."}), 400
+
+        active_count = session_db.query(QueueEntry).filter_by(
+            provider_id=settings.provider_id
+        ).filter(
+            QueueEntry.status.notin_(["completed", "no_show"])
+        ).count()
+
+        if active_count >= settings.queue_max_length:
+            return jsonify({"error": "Die Warteschlange ist aktuell voll."}), 400
+
+        new_entry = QueueEntry(
+            provider_id=settings.provider_id,
+            customer_name=customer_name,
+            customer_phone=customer_phone,
+            service_id=service.id,
+            duration_minutes=service.duration_minutes,
+            position=active_count + 1,
+            original_position=active_count + 1,
+            status="pending"
+        )
+
+        session_db.add(new_entry)
+        session_db.flush()
+        queue_id = new_entry.id
+        session_db.commit()
+
+        return jsonify({"queue_id": queue_id}), 200
+
+    except Exception as e:
+        print(e)
+        return jsonify({"error": str(e)}), 500
+
+    finally:
+        session_db.close()
+
+@app.route("/queue/<string:token>/status/<int:queue_id>")
+def customer_queue_status(token, queue_id):
+    pass
+
+
 @app.route("/dashboard/upgrade")
 @login_required
 def upgrade():
     return render_template("upgrade.html")
+
+
 
 reminder_thread = threading.Thread(target=reminder_worker, daemon=True)
 reminder_thread.start()

@@ -430,10 +430,25 @@
     }
 
     .hint {
-      font-size: 12px;
+      font-size: 13px;
       color: #9ca3af;
-      margin-bottom: 20px;
+      margin-left: 24px;
+      margin: 20px;
       line-height: 1.5;
+    }
+
+    .hint a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    .hint a {
+      color: #0000EE;
+      text-decoration: none;
+    }
+
+    .hint a:hover {
+      text-decoration: underline;
     }
 
     .hint strong { color: #6b7280; }
@@ -770,6 +785,12 @@
             </a>
           </div>
         {% else %}
+          <div class="hint">
+              SMS-Menge: {{ sms_credits_used }} / {{ sms_limit }} diesen Monat genutzt.
+              {% if sms_credits_used >= sms_limit %}
+                <a href="/dashboard/upgrade">Jetzt upgraden für mehr SMS →</a>
+              {% endif %}
+          </div>
           <div class="form-row">
             <div class="form-row-label">SMS aktivieren</div>
             <div class="form-row-value">

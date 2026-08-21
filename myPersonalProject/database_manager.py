@@ -127,7 +127,7 @@ class ProviderSettings(Base):
 
     sms_enabled = Column(Boolean, default=False)
 
-    sms_credits_used  = Column(Integer, default=0)
+    sms_credits_used = Column(Integer, default=0)
     sms_credits_reset = Column(DateTime, default=datetime.utcnow)
 
     queue_token = Column(String(64), unique=True, nullable=True)

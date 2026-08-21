@@ -155,53 +155,54 @@ body {
 }
 
 .verify-container {
-  background:white;
-  padding:45px;
-  border-radius:12px;
-  width:400px;
-  text-align:center;
-  box-shadow:0 10px 30px rgba(0,0,0,0.08);
+  background: white;
+  padding: 45px;
+  border-radius: 12px;
+  width: 400px;
+  text-align: center;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+  margin: auto;
 }
 
 .verify-container h1 {
-  margin-bottom:10px;
+  margin-bottom: 10px;
 }
 
 .verify-container p {
-  color:#666;
-  font-size:14px;
-  margin-bottom:30px;
+  color: #666;
+  font-size: 14px;
+  margin-bottom: 30px;
 }
 
 .code-boxes {
-  display:flex;
-  justify-content:center;
-  gap:12px;
-  margin-bottom:25px;
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom:  25px;
 }
 
 .code-input {
-  width:55px;
-  height:60px;
-  font-size:26px;
-  text-align:center;
-  border:1px solid #ccc;
-  border-radius:8px;
+  width: 55px;
+  height: 60px;
+  font-size: 26px;
+  text-align: center;
+  border: 1px solid #ccc;
+  border-radius: 8px;
 }
 
 .resend {
-  margin-top:18px;
-  font-size:14px;
+  margin-top: 18px;
+  font-size: 14px;
 }
 
 .resend a {
-  color:#4CAF50;
-  text-decoration:none;
+  color: #4CAF50;
+  text-decoration: none;
 }
 
 .resend a:hover {
-  color:#4CAF50;
-  text-decoration:underline;
+  color: #4CAF50;
+  text-decoration: underline;
 }
 
 .reset-container {
@@ -211,6 +212,7 @@ body {
   padding: 32px 28px;
   border-radius: 18px;
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.08);
+  margin: auto;
   text-align: center;
 }
 

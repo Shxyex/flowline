@@ -5,12 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Warteschlange geschlossen – Flowline</title>
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
             background: #f0f2ee;
             min-height: 100vh;
             display: flex;
+            flex-direction: column;
             align-items: center;
             justify-content: center;
             padding: 24px;
@@ -23,6 +23,7 @@
             max-width: 400px;
             text-align: center;
             box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+            margin: auto;
         }
         .icon { font-size: 48px; margin-bottom: 20px; }
         h1 { font-size: 20px; font-weight: 700; color: #111827; margin-bottom: 10px; }
@@ -31,11 +32,20 @@
     </style>
 </head>
 <body>
-<div class="card">
-    <div class="icon">🚪</div>
-    <h1>Aktuell keine Anmeldung möglich</h1>
-    <p>Die Warteschlange ist momentan geschlossen. Bitte wende dich direkt an das Salon-Personal oder versuche es später erneut.</p>
-    <div class="logo">Flowline</div>
-</div>
+    <div class="card">
+        <div class="icon">🚪</div>
+        <h1>Aktuell keine Anmeldung möglich</h1>
+        <p>Die Warteschlange ist momentan geschlossen. Bitte wende dich direkt an das Salon-Personal oder versuche es später erneut.</p>
+        <div class="logo">Flowline</div>
+    </div>
+
+    <div style="text-align:center;font-size:12px;color:#9ca3af;margin-top:16px;">
+        <div style="margin-bottom:6px;">
+            <a href="#" style="color:#6b7280;text-decoration:underline;">Nutzungsbedingungen</a>
+            <span style="margin:0 6px;">|</span>
+            <a href="#" style="color:#6b7280;text-decoration:underline;">Datenschutz</a>
+        </div>
+        <div>© 2026 <a href="#" style="color:#6b7280;text-decoration:underline;">Flowline</a>. Alle Rechte vorbehalten.</div>
+    </div>
 </body>
 </html>

@@ -8,50 +8,62 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
 </head>
-<body>
-  <h1 class="text-3xl font-semibold text-gray-900 mb-8">
-    Melde dich in deinem Anbieter‑Konto an
-  </h1>
+<body class="min-h-screen flex flex-col">
 
-  <form onsubmit="submitForm('/provider-login'); return false;"
-        class="w-full max-w-md bg-white p-8 rounded-xl shadow-lg border border-gray-200">
+  <div class="flex-1 flex flex-col items-center justify-center">
+    <h1 class="text-3xl font-semibold text-gray-900 mb-8">
+      Melde dich in deinem Anbieter‑Konto an
+    </h1>
 
-    <h2 class="text-2xl font-semibold text-center text-gray-800 mb-6">
-      Als Anbieter anmelden
-    </h2>
+    <form onsubmit="submitForm('/provider-login'); return false;"
+          class="w-full max-w-md bg-white p-8 rounded-xl shadow-lg border border-gray-200">
 
-    <div class="form-group mb-5">
-      <label for="provider-email">E-Mail</label>
-      <input type="email" id="provider-email" name="email" placeholder="E-Mail" required>
-    </div>
+      <h2 class="text-2xl font-semibold text-center text-gray-800 mb-6">
+        Als Anbieter anmelden
+      </h2>
 
-    <div class="form-group mb-5">
-      <label for="provider-password">Passwort</label>
-
-      <div class="password-wrapper">
-        <input type="password" id="provider-password" name="password" placeholder="Passwort" minlength="8" required>
+      <div class="form-group mb-5">
+        <label for="provider-email">E-Mail</label>
+        <input type="email" id="provider-email" name="email" placeholder="E-Mail" required>
       </div>
-    </div>
 
-    <div class="forgot-password">
-      <section>
-        <input type="checkbox" id="remember_me" name="remember_me" checked>
-        <label for="remember_me">Angemeldet bleiben</label>
-      </section>
+      <div class="form-group mb-5">
+        <label for="provider-password">Passwort</label>
 
-      <section>
-        <a href="/password-reset">Passwort vergessen</a>
-      </section>
-    </div>
+        <div class="password-wrapper">
+          <input type="password" id="provider-password" name="password" placeholder="Passwort" minlength="8" required>
+        </div>
+      </div>
 
-    <button type="submit" class="btn-primary">Einloggen</button>
+      <div class="forgot-password">
+        <section>
+          <input type="checkbox" id="remember_me" name="remember_me" checked>
+          <label for="remember_me">Angemeldet bleiben</label>
+        </section>
 
-    <p class="provider-register">
-      Noch keinen Account?
-      <a href="/register/provider">Hier registrieren</a>
-    </p>
+        <section>
+          <a href="/password-reset">Passwort vergessen</a>
+        </section>
+      </div>
 
-  </form>
+      <button type="submit" class="btn-primary">Einloggen</button>
+
+      <p class="provider-register">
+        Noch keinen Account?
+        <a href="/register/provider">Hier registrieren</a>
+      </p>
+
+    </form>
+  </div>
+
+  <div class="text-center text-xs text-gray-400 mt-auto mb-4">
+      <div class="mb-1">
+          <a href="#" class="underline text-gray-500">Nutzungsbedingungen</a>
+          <span class="mx-2">|</span>
+          <a href="#" class="underline text-gray-500">Datenschutz</a>
+      </div>
+      <div>© 2026 <a href="#" class="underline text-gray-500">Flowline</a>. Alle Rechte vorbehalten.</div>
+  </div>
 
   <div id="error-popup" class="popup">
     <div id="error" class="error"></div>

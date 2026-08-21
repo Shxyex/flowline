@@ -1,10 +1,268 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="de">
 <head>
     <meta charset="UTF-8">
-    <title>Title</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ provider.business_name }} – Warteschlange</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background: #f0f2ee;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 440px;
+        }
+
+        .logo {
+            text-align: center;
+            font-size: 22px;
+            font-weight: 700;
+            color: #2d6a4f;
+            margin-bottom: 8px;
+            letter-spacing: -0.3px;
+        }
+
+        .provider-name {
+            text-align: center;
+            font-size: 14px;
+            color: #6b7280;
+            margin-bottom: 28px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 16px;
+            padding: 36px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+        }
+
+        .card-header {
+            margin-bottom: 28px;
+        }
+        .card-header h1 {
+            font-size: 22px;
+            font-weight: 700;
+            color: #111827;
+            letter-spacing: -0.4px;
+            margin-bottom: 6px;
+        }
+        .card-header p {
+            font-size: 14px;
+            color: #6b7280;
+            line-height: 1.5;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            font-size: 16px;
+            font-weight: 500;
+            color: #333;
+        }
+
+        .form-group input,
+        .form-group select {
+            padding: 14px 16px;
+            border-radius: 8px;
+            border: 1px solid #d0d7e2;
+            font-size: 16px;
+            flex: 1;
+            transition: border-color .2s, box-shadow .2s;
+            font-family: inherit;
+            background: white;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            border-color: #4CAF50;
+            box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.25);
+            outline: none;
+        }
+
+        .btn-primary {
+            width: 100%;
+            padding: 12px;
+            background: #4CAF50;
+            color: white;
+            font-size: 16px;
+            font-weight: 600;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-top: 10px;
+            box-shadow: 0 0 8px rgba(76, 175, 80, 0.35);
+            transition:
+                background-color 0.25s ease,
+                transform 0.2s ease,
+                box-shadow 0.25s ease;
+        }
+
+        .btn-primary:hover {
+            background-color: #45a049;
+            transform: translateY(-1px);
+            box-shadow: 0 0 14px rgba(76, 175, 80, 0.55);
+        }
+
+        .btn-primary:active {
+            transform: translateY(0);
+            box-shadow: 0 0 6px rgba(76, 175, 80, 0.3);
+        }
+
+        .btn-primary:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+            box-shadow: none;
+            transform: none;
+        }
+
+        .error-msg {
+            font-size: 13px;
+            color: #ef4444;
+            margin-top: 12px;
+            display: none;
+            text-align: center;
+        }
+        .error-msg.show { display: block; }
+
+        .full-notice {
+            background: #fef2f2;
+            border: 1.5px solid #fecaca;
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+        }
+        .full-notice .icon { font-size: 32px; margin-bottom: 10px; }
+        .full-notice p { font-size: 14px; color: #991b1b; line-height: 1.5; }
+
+        .footer-note {
+            text-align: center;
+            font-size: 12px;
+            color: #9ca3af;
+            margin-top: 20px;
+        }
+    </style>
 </head>
 <body>
 
+<div class="container">
+    <div class="logo">Flowline</div>
+    <div class="provider-name">{{ provider.business_name }}</div>
+
+    <div class="card">
+
+        {% if is_full %}
+        <div class="full-notice">
+            <div class="icon">⏳</div>
+            <p><strong>Die Warteschlange ist aktuell voll.</strong><br>
+            Bitte versuche es in ein paar Minuten erneut oder wende dich direkt an das Personal.</p>
+        </div>
+        {% else %}
+
+        <div class="card-header">
+            <h1>In Warteschlange eintragen</h1>
+            <p>Trag dich ein und sieh in Echtzeit wann du dran bist.</p>
+        </div>
+
+        <div class="form-group">
+            <label for="customer_name">Dein Name</label>
+            <input type="text" id="customer_name" placeholder="Max Mustermann">
+        </div>
+
+        <div class="form-group">
+            <label for="customer_phone">Telefonnummer (optional)</label>
+            <input type="tel" id="customer_phone" placeholder="+49 123 456789">
+        </div>
+
+        <div class="form-group">
+            <label for="customer_service">Service</label>
+            <select id="customer_service">
+                <option value="">Service auswählen...</option>
+                {% for s in service %}
+                    <option value="{{ s.id }}">{{ s.name }} ({{ s.duration_minutes }} Min)</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <button class="btn-primary" id="submit-btn" onclick="joinQueue()">
+            Jetzt eintragen →
+        </button>
+
+        <div class="error-msg" id="error-msg"></div>
+
+        {% endif %}
+    </div>
+
+    <div style="text-align:center;font-size:12px;color:#9ca3af;margin-top:16px;">
+        <div style="margin-bottom:6px;">
+            <a href="#" style="color:#6b7280;text-decoration:underline;">Nutzungsbedingungen</a>
+            <span style="margin:0 6px;">|</span>
+            <a href="#" style="color:#6b7280;text-decoration:underline;">Datenschutz</a>
+        </div>
+        <div>© 2026 <a href="#" style="color:#6b7280;text-decoration:underline;">Flowline</a>. Alle Rechte vorbehalten.</div>
+    </div>
+</div>
+
+<script>
+  async function joinQueue() {
+      const name = document.getElementById("customer_name").value.trim();
+      const phone = document.getElementById("customer_phone").value.trim();
+      const service_id = document.getElementById("customer_service").value;
+      const errorMsg = document.getElementById("error-msg");
+
+      if (!name || !service_id) {
+          errorMsg.textContent = "Bitte Name und Service ausfüllen.";
+          errorMsg.classList.add("show");
+          return;
+      }
+
+      errorMsg.classList.remove("show");
+
+      const btn = document.getElementById("submit-btn");
+      btn.disabled = true;
+      btn.textContent = "Wird eingetragen...";
+
+      const formData = new FormData();
+      formData.append("customer_name", name);
+      formData.append("customer_phone", phone);
+      formData.append("service_id", service_id);
+
+      try {
+          const res = await fetch("/queue/{{ token }}/join", {
+              method: "POST",
+              body: formData
+          });
+
+          const data = await res.json();
+
+          if (res.ok) {
+              window.location.href = `/queue/{{ token }}/status/${data.queue_id}`;
+          } else {
+              btn.disabled = false;
+              btn.textContent = "Jetzt eintragen →";
+              errorMsg.textContent = data.error || "Ein Fehler ist aufgetreten.";
+              errorMsg.classList.add("show");
+          }
+      } catch (e) {
+          btn.disabled = false;
+          btn.textContent = "Jetzt eintragen →";
+          errorMsg.textContent = "Verbindungsfehler. Bitte versuche es erneut.";
+          errorMsg.classList.add("show");
+      }
+  }
+</script>
 </body>
 </html>
